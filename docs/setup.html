@@ -7,6 +7,21 @@
   <meta name="description" content="Flash firmware, configure WiFi, and add StepStick to OBS — all from your browser.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
   <link rel="stylesheet" href="./style.css">
+  <script>
+    // Ensure the serial port is closed before opening, in case a previous
+    // connection attempt left it open.
+    const _origOpen = SerialPort.prototype.open;
+    SerialPort.prototype.open = async function (options) {
+      if (this.readable !== null) {
+        try {
+          if (this.readable.locked) await this.readable.cancel();
+          if (this.writable?.locked) await this.writable.abort();
+          await this.close();
+        } catch (_) {}
+      }
+      return _origOpen.call(this, options);
+    };
+  </script>
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
     .widget {
