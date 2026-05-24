@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiFi Setup — StepStick</title>
+  <meta name="description" content="Update the WiFi credentials on your StepStick device via USB.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .field input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    #wifi-log {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      min-height: 24px;
+      color: var(--muted);
+    }
+    #wifi-log.error { color: #ff8888; }
+    #wifi-log.success { color: var(--accent); }
+    #no-serial {
+      display: none;
+      background: rgba(255,68,68,0.07);
+      border: 1px solid rgba(255,68,68,0.22);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: #ffbbbb;
+      font-size: 0.92rem;
+      margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+  <div class="nav-links">
+    <a href="./index.html">Home</a>
+    <a href="./setup.html">Get Started</a>
+    <a href="./wifi.html" class="active">WiFi</a>
+    <a href="./technical.html">Technical</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">WiFi Setup</h1>
+  <p style="color:var(--muted); margin-bottom:32px;">Update the WiFi credentials on an already-flashed device. Connect via USB-C, enter your 2.4 GHz network details, and click Connect.</p>
+
+  <div id="no-serial">
+    <strong>Browser not supported.</strong> Web Serial requires Chrome or Edge on desktop. Safari and Firefox are not supported.
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="wifi-ssid">Network name (SSID)</label>
+      <input type="text" id="wifi-ssid" placeholder="My WiFi" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="wifi-pass">Password</label>
+      <input type="password" id="wifi-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn btn-primary" id="wifi-btn" onclick="provisionWifi()">📶 Connect Device via USB</button>
+    <div id="wifi-log"></div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <span>ESP32-S3 is <strong>2.4 GHz only</strong>. 5 GHz networks will fail to connect.</span>
+  </div>
+
+  <div class="callout tip" style="margin-top:12px;">
+    <span class="callout-icon">💡</span>
+    <span>You can also clear WiFi credentials directly on the device by holding Button B until it restarts into provisioning mode.</span>
+  </div>
+
+</div>
+
+<footer>
+  <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
+  MIT License
+</footer>
+
+<script>
+if (!('serial' in navigator)) {
+  document.getElementById('no-serial').style.display = 'block';
+  document.getElementById('wifi-btn').disabled = true;
+}
+
+// ── Improv WiFi Serial Protocol ────────────────────────────────────────────
+// Spec: https://www.improv-wifi.com/serial/
+// Packet: "IMPROV"(6) | version(1) | type(1) | length(1) | data(N) | checksum(1)
+// Type 0x01 = Current State   (device → host)
+// Type 0x02 = Error State     (device → host)
+// Type 0x03 = RPC Command     (host → device)
+// RPC command 0x01 = Send WiFi settings: [ssid_len][ssid...][pass_len][pass...]
+
+const MAGIC = [0x49, 0x4D, 0x50, 0x52, 0x4F, 0x56]; // "IMPROV"
+
+function buildWifiPacket(ssid, pass) {
+  const enc = new TextEncoder();
+  const s = enc.encode(ssid);
+  const p = enc.encode(pass);
+  const cmdData = [s.length, ...s, p.length, ...p];
+  const rpcData = [0x01, cmdData.length, ...cmdData];
+  const bytes = [...MAGIC, 0x01, 0x03, rpcData.length, ...rpcData];
+  let sum = 0;
+  bytes.forEach(b => sum = (sum + b) & 0xFF);
+  return new Uint8Array([...bytes, sum]);
+}
+
+function scanBuffer(buf) {
+  let state = null, error = null;
+  for (let i = 0; i <= buf.length - 9; i++) {
+    if (!MAGIC.every((b, j) => buf[i + j] === b)) continue;
+    const type = buf[i + 7];
+    const len  = buf[i + 8];
+    if (buf.length < i + 9 + len + 1) break;
+    let sum = 0;
+    for (let j = i; j < i + 9 + len; j++) sum = (sum + buf[j]) & 0xFF;
+    if (sum !== buf[i + 9 + len]) { i++; continue; }
+    const data = buf.slice(i + 9, i + 9 + len);
+    if (type === 0x01 && data.length) state = data[0];
+    if (type === 0x02 && data.length) error = data[0];
+    i += 9 + len;
+  }
+  return { state, error };
+}
+
+const STATE_LABELS = {
+  0x02: 'Waiting for authorisation…',
+  0x03: 'WiFi credentials received…',
+  0x04: 'Connecting to WiFi…',
+  0x05: '✓ Connected!',
+};
+
+const ERROR_LABELS = {
+  0x01: 'Invalid RPC packet',
+  0x02: 'Unknown command',
+  0x03: 'Unable to connect — check password and network',
+  0x04: 'Not authorised',
+};
+
+function setLog(msg, cls = '') {
+  const el = document.getElementById('wifi-log');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+async function provisionWifi() {
+  const ssid = document.getElementById('wifi-ssid').value.trim();
+  const pass = document.getElementById('wifi-pass').value;
+  if (!ssid) { setLog('Enter a network name.', 'error'); return; }
+
+  const btn = document.getElementById('wifi-btn');
+  btn.disabled = true;
+
+  let port;
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    setLog('Sending credentials…');
+
+    const writer = port.writable.getWriter();
+    await writer.write(buildWifiPacket(ssid, pass));
+    writer.releaseLock();
+
+    const reader = port.readable.getReader();
+    const buf = [];
+    let finished = false;
+    const timer = setTimeout(() => { finished = true; reader.cancel(); }, 20000);
+
+    while (!finished) {
+      try {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) buf.push(...value);
+      } catch {
+        break;
+      }
+
+      const { state, error } = scanBuffer(buf);
+
+      if (error !== null) {
+        setLog('Error: ' + (ERROR_LABELS[error] ?? 'Unknown error (code ' + error + ')'), 'error');
+        finished = true;
+      } else if (state !== null) {
+        setLog(STATE_LABELS[state] ?? 'State ' + state);
+        if (state === 0x05) finished = true;
+      }
+    }
+
+    clearTimeout(timer);
+    reader.releaseLock();
+
+    if (buf.length === 0) setLog('No response from device. Is it connected and running StepStick firmware?', 'error');
+  } catch (e) {
+    if (e.name !== 'NotFoundError')
+      setLog('Error: ' + e.message, 'error');
+  } finally {
+    if (port) try { await port.close(); } catch {}
+    btn.disabled = false;
+  }
+}
+</script>
+
+</body>
+</html>
