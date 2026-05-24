@@ -1,111 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StepStick — Stream Pedometer</title>
-  <meta name="description" content="A step-counter overlay for live streamers. Runs on M5Stack StickS3 and integrates with OBS via browser source.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <meta name="description" content="A private, local step-counter overlay for live streamers. Plug and play with OBS.">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
   <link rel="stylesheet" href="./style.css">
 </head>
+
 <body>
 
-<nav>
-  <a class="nav-brand" href="./index.html">🦶 StepStick</a>
-  <div class="nav-links">
-    <a href="./index.html" class="active">Home</a>
-    <a href="./setup.html">Get Started</a>
-    <a href="./wifi.html">WiFi</a>
-    <a href="./technical.html">Technical</a>
-  </div>
-</nav>
+  <nav>
+    <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+    <div class="nav-links">
+      <a href="./index.html" class="active">Home</a>
+      <a href="./setup.html">Get Started</a>
+      <a href="./wifi.html">WiFi</a>
+      <a href="./technical.html">Technical</a>
+    </div>
+  </nav>
 
-<div class="hero">
-  <span class="hero-icon">🦶</span>
-  <h1>Step<span>Stick</span></h1>
-  <p>A live step-counter overlay for streamers. Wear your M5StickS3, walk around, and your audience sees every step in real time.</p>
-  <div class="btn-row">
-    <a class="btn btn-primary" href="./flash.html">⚡ Flash Firmware</a>
-    <a class="btn btn-secondary" href="./setup.html">Setup Guide</a>
-    <a class="btn btn-secondary" href="https://github.com/jhlwscom/stepstick">GitHub</a>
-  </div>
-</div>
-
-<div class="container">
-
-  <div class="card-grid">
-    <div class="card">
-      <div class="card-icon">📡</div>
-      <h2>Real-time overlay</h2>
-      <p>Step count and activity state stream live to OBS via WebSocket — zero delay, zero plugins.</p>
-    </div>
-    <div class="card">
-      <div class="card-icon">🎨</div>
-      <h2>Fully themeable</h2>
-      <p>Customise colours, icons, glow effects, and greyscale transitions directly from the on-device web UI.</p>
-    </div>
-    <div class="card">
-      <div class="card-icon">🏃</div>
-      <h2>Activity detection</h2>
-      <p>The BMI270 IMU distinguishes Still, Walking, and Running states and reflects them in the overlay automatically.</p>
-    </div>
-    <div class="card">
-      <div class="card-icon">🔋</div>
-      <h2>Battery aware</h2>
-      <p>A low-battery warning appears in the overlay when charge drops below 15 %, and the display sleeps after 15 s of inactivity.</p>
-    </div>
-    <div class="card">
-      <div class="card-icon">🌐</div>
-      <h2>Browser flash</h2>
-      <p>No toolchain needed. Flash firmware straight from your browser over USB with esp-web-tools.</p>
-    </div>
-    <div class="card">
-      <div class="card-icon">📶</div>
-      <h2>Easy WiFi setup</h2>
-      <p>Provision WiFi credentials over USB serial with the Improv protocol — no app, no pairing mode.</p>
+  <div class="hero">
+    <span class="hero-icon">🦶</span>
+    <h1>Step<span>Stick</span></h1>
+    <p>Real-time step tracking for your stream. No subscriptions, no cloud, and zero privacy risks. Just plug it in and
+      walk.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="./flash.html">⚡ Install to Device</a>
+      <a class="btn btn-secondary" href="./setup.html">Setup Guide</a>
+      <a class="btn btn-secondary" href="https://github.com/jhlwscom/stepstick">GitHub</a>
     </div>
   </div>
 
-  <h2 class="section-title">How it works</h2>
+  <div class="container">
 
-  <ol class="steps">
-    <li>
-      <div class="step-body">
-        <h3>Flash the firmware</h3>
-        <p>Connect your M5StickS3 via USB and use the <a href="./flash.html">browser flasher</a> to install the firmware in one click.</p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h2>100% Local & Private</h2>
+        <p>Your movement data never leaves your home network. No cloud accounts, no telemetry, and zero reliance on
+          third-party fitness apps.</p>
       </div>
-    </li>
-    <li>
-      <div class="step-body">
-        <h3>Provision WiFi</h3>
-        <p>Use any Improv-compatible tool (or the <a href="https://www.improv-wifi.com">Improv web app</a>) to send your WiFi credentials over USB serial. The device IP is shown on screen once connected.</p>
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <h2>Native OBS Integration</h2>
+        <p>Works flawlessly as a standard Browser Source. Zero delay, zero screen-capture clipping, and no extra PC
+          software required.</p>
       </div>
-    </li>
-    <li>
-      <div class="step-body">
-        <h3>Open the config page</h3>
-        <p>Navigate to <code>http://stepstick.local</code> (or the IP on screen) to customise your overlay theme and copy the OBS browser-source URL.</p>
+      <div class="card">
+        <div class="card-icon">🏃</div>
+        <h2>Smart Activity Tracking</h2>
+        <p>Automatically detects whether you are standing still, walking, or running, instantly updating the stream
+          graphic to match your energy.</p>
       </div>
-    </li>
-    <li>
-      <div class="step-body">
-        <h3>Add to OBS</h3>
-        <p>Paste the overlay URL as a Browser Source in OBS. Set a transparent background (clear the Custom CSS field) and resize to taste.</p>
+      <div class="card">
+        <div class="card-icon">🎨</div>
+        <h2>Stream-Ready Themes</h2>
+        <p>Customise colours, icons, and glow effects directly from a built-in webpage to perfectly match your channel's
+          branding.</p>
       </div>
-    </li>
-  </ol>
+      <div class="card">
+        <div class="card-icon">🔋</div>
+        <h2>Battery Aware</h2>
+        <p>Tracks your device battery life and flashes a low-power warning directly on your stream overlay so you never
+          drop out mid-broadcast.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌐</div>
+        <h2>Browser Installation</h2>
+        <p>No coding required. Install the software and connect the device to your Wi-Fi directly through Chrome or Edge
+          with a single click.</p>
+      </div>
+    </div>
 
-  <div class="callout tip">
-    <span class="callout-icon">💡</span>
-    <span>After saving theme changes the overlay reloads automatically — no need to refresh OBS.</span>
+    <h2 class="section-title">Ready in 4 Steps</h2>
+
+    <ol class="steps">
+      <li>
+        <div class="step-body">
+          <h3>1. Install the Software</h3>
+          <p>Plug your M5StickS3 into your PC via USB. Use our <a href="./flash.html">web installer</a> to load the
+            tracker software directly from your browser.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>2. Connect to Wi-Fi</h3>
+          <p>Immediately after installing, click "Configure Wi-Fi" in your browser to securely connect the tracker to
+            your home network.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>3. Customise</h3>
+          <p>Go to <code>http://stepstick.local</code> to pick your stream colours and copy your private OBS overlay
+            URL.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>4. Add to OBS</h3>
+          <p>Paste the URL as a new <strong>Browser Source</strong> in OBS. Set a transparent background, resize it, and
+            start walking.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <span>Once added to OBS, the overlay updates automatically whenever you change colours in the web dashboard — no
+        need to refresh!</span>
+    </div>
+
   </div>
 
-</div>
-
-<footer>
-  <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
-  MIT License
-</footer>
+  <footer>
+    <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
+    MIT License
+  </footer>
 
 </body>
+
 </html>

@@ -26,10 +26,44 @@
   <div class="container">
 
     <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">Technical Reference</h1>
-    <p style="color:var(--muted); margin-bottom:40px;">HTTP API, WebSocket protocol, hardware details, and theme
-      internals.</p>
+    <p style="color:var(--muted); margin-bottom:40px;">Architecture rationale, HTTP API, WebSocket protocol, hardware
+      details, and theme internals.</p>
 
-    <!-- ── Hardware ── -->
+    <h2 class="section-title">Architecture & Design Rationale</h2>
+    <p style="color:var(--muted); font-size:0.95rem; margin-bottom:20px; line-height:1.6;">
+      StepStick is designed to be a local-first, low-latency device. Several key engineering decisions were made to
+      optimize for the limited 250mAh battery of the M5StickS3 and to streamline the user experience for non-technical
+      streamers.
+    </p>
+
+    <div style="margin-bottom: 40px;">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Improv Serial vs. Captive Portal</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        Traditional IoT setups rely on captive portals (e.g., WiFiManager), which require the ESP32 to run a temporary
+        AP, a DNS server, and an HTTP server. This consumes significant heap memory, delays the boot sequence, and
+        causes friction on mobile devices. By relying exclusively on the <strong>Improv Wi-Fi serial standard</strong>,
+        we offload provisioning to the user's browser via Web Serial. This reduces the firmware footprint and allows for
+        a seamless, one-click setup directly following the firmware flash.
+      </p>
+
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Event-Driven WebSockets over HTTP Polling</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        If OBS were configured to poll the device for step updates via standard HTTP requests, the ESP32 radio would
+        remain constantly active, severely degrading battery life. Instead, StepStick acts as a WebSocket server. OBS
+        connects once, and the ESP32 only broadcasts a payload when the BMI270 IMU registers an explicit step increment
+        or a state transition. During periods of inactivity, network traffic is zero.
+      </p>
+
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Dynamic CSS Injection</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        To allow users to theme their overlay without touching OBS settings, theme preferences are stored in ESP32
+        Non-Volatile Storage (NVS). The <code>/theme.css</code> endpoint dynamically generates a stylesheet based on
+        these NVS values. When a user updates the theme via the web UI, the device broadcasts a
+        <code>{"command": "reload"}</code> WebSocket payload. OBS receives this, automatically refreshes the browser
+        source, and pulls the newly generated CSS, creating a real-time remote-control experience.
+      </p>
+    </div>
+
     <h2 class="section-title">Hardware</h2>
 
     <div class="table-wrap">
@@ -77,7 +111,6 @@
       </table>
     </div>
 
-    <!-- ── Firmware ── -->
     <h2 class="section-title" style="margin-top:40px;">Firmware</h2>
 
     <div class="table-wrap">
@@ -125,10 +158,10 @@
       </table>
     </div>
 
-    <!-- ── HTTP Endpoints ── -->
     <h2 class="section-title" style="margin-top:40px;">HTTP Endpoints</h2>
     <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">All endpoints are served on port
-      <strong>80</strong>.</p>
+      <strong>80</strong>.
+    </p>
 
     <div class="table-wrap">
       <table>
@@ -170,11 +203,11 @@
       </table>
     </div>
 
-    <!-- ── WebSocket ── -->
     <h2 class="section-title" style="margin-top:40px;">WebSocket API</h2>
     <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">The device runs a WebSocket server on port
       <strong>81</strong>. The overlay connects to <code>ws://&lt;device-ip&gt;:81/</code> and reconnects automatically
-      on disconnect.</p>
+      on disconnect.
+    </p>
 
     <h3 style="font-size:1rem; font-weight:700; margin-bottom:10px;">Server → Client messages</h3>
     <p style="color:var(--muted); font-size:0.93rem; margin-bottom:10px;">Sent immediately on connect, and again
@@ -197,7 +230,6 @@
         polling traffic during idle periods.</span>
     </div>
 
-    <!-- ── Activity States ── -->
     <h2 class="section-title" style="margin-top:40px;">Activity States</h2>
 
     <div class="table-wrap">
@@ -237,7 +269,6 @@
       step-activity feature. The sensor only transitions <em>from</em> STILL when motion begins; it never re-reports
       STILL once motion has started during a session (the firmware preserves the last active state).</p>
 
-    <!-- ── Theme System ── -->
     <h2 class="section-title" style="margin-top:40px;">Theme System</h2>
     <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">Theme values are stored in NVS and served as
       CSS custom properties via <code>/theme.css</code>. The overlay loads this stylesheet on every page load.</p>
@@ -339,7 +370,6 @@
       </table>
     </div>
 
-    <!-- ── Dependencies ── -->
     <h2 class="section-title" style="margin-top:40px;">Dependencies</h2>
 
     <div class="table-wrap">
