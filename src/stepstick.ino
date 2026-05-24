@@ -24,6 +24,7 @@ uint32_t displaySteps = 0;
 uint32_t lastBroadcastSteps = 0;
 Activity currentActivity = STILL;
 Activity lastActivity = UNKNOWN;
+Activity lastSentActivity = STILL;
 String activityString = "🧍";
 int batteryLevel = 0;
 
@@ -630,8 +631,7 @@ void loop() {
   imu.getStepCount(&hwStepCount);
   uint8_t currentSensorActivity;
   imu.getStepActivity(&currentSensorActivity);
-  if (currentSensorActivity != (uint8_t)STILL)
-    currentActivity = (Activity)currentSensorActivity;
+  currentActivity = (Activity)currentSensorActivity;
 
   if (currentActivity >= 1)
     lastInteractionTime = millis();
@@ -646,12 +646,21 @@ void loop() {
 
   activityString = getIconStr(currentActivity);
 
-  if (currentActivity != lastActivity ||
-      abs((int)(displaySteps - lastBroadcastSteps)) >= 10) {
-    String payload = buildStateJson();
-    webSocket.broadcastTXT(payload);
-    lastBroadcastSteps = displaySteps;
-    lastActivity = currentActivity;
+  static int batchThreshold = random(8, 15);
+  if (displaySteps != lastBroadcastSteps || currentActivity != lastActivity) {
+
+    // Only broadcast if the state changed, OR if we hit our jitter threshold
+    if (currentActivity != lastActivity ||
+        abs((int)(displaySteps - lastBroadcastSteps)) >= batchThreshold) {
+
+      String payload = buildStateJson();
+      webSocket.broadcastTXT(payload);
+
+      lastBroadcastSteps = displaySteps;
+      lastActivity = currentActivity;
+
+      batchThreshold = random(8, 15);
+    }
   }
 
   static unsigned long lastDisplayUpdate = 0;
