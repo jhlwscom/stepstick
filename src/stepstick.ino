@@ -556,7 +556,7 @@ void setup() {
   batteryLevel = M5.Power.getBatteryLevel();
 
   M5.Display.fillScreen(TFT_BLACK);
-  if (MDNS.begin("stepcounter")) {
+  if (MDNS.begin("stepstick")) {
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("ws", "tcp", 81);
   }
