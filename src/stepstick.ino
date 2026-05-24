@@ -33,15 +33,20 @@ unsigned long lastInteractionTime = 0;
 const unsigned long SCREEN_TIMEOUT = 15000;
 bool isScreenOn = true;
 
-// --- Theme Variables ---
-String themeBgColor = "#0f0f14";
-String themeTextColor = "#ffffff";
-String themeWalkColor = "#00ffcc";
-String themeRunColor = "#ff4444";
+// --- Overlay Modes ---
+int overlayMode = 1; // 0 = Simple, 1 = Standard, 2 = Advanced
+String simpleFont;
+String simpleColor;
 
-String iconStill = "";
-String iconWalk = "";
-String iconRun = "";
+// --- Theme Variables ---
+String themeBgColor;
+String themeTextColor;
+String themeWalkColor;
+String themeRunColor;
+
+String iconStill;
+String iconWalk;
+String iconRun;
 
 bool themeGlow = true;
 bool themeGreyscale = true;
@@ -82,33 +87,137 @@ const char *configHTML = R"rawliteral(
     <title>Step Counter Config</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
     <style>
-        body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; max-width: 400px; margin: 0 auto; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 8px; text-align: left; margin-bottom: 20px; }
-        h1 { color: #00ffcc; text-align: center; }
-        h2 { text-align: center; font-size: 1.2rem; }
-        .btn { background: #ff4444; color: white; border: none; padding: 15px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
-        .btn-save { background: #00ffcc; color: #000; }
-        .btn:hover { opacity: 0.8; }
-        .form-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .form-group.col { flex-direction: column; align-items: flex-start; gap: 8px; }
-        input[type="color"] { border: none; width: 50px; height: 30px; background: none; cursor: pointer; }
-        input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 4px; }
-        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
-        .help-text { font-size: 12px; color: #888; margin-top: -5px; }
+        :root {
+            --bg-base: #0f0f14;
+            --bg-card: #1c1c24;
+            --bg-input: #2a2a35;
+            --border: #333344;
+            --accent: #00ffcc;
+            --accent-hover: #00e6b8;
+            --danger: #ff4444;
+            --text-main: #ffffff;
+            --text-muted: #888899;
+            --radius: 12px;
+        }
+
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            background: var(--bg-base); 
+            color: var(--text-main); 
+            padding: 20px; 
+            max-width: 480px; 
+            margin: 0 auto; 
+            line-height: 1.5;
+        }
+
+        h1, h2, h3 { margin: 0 0 16px 0; font-weight: 600; }
+        h2 { font-size: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;}
         
-        .copy-box { display: flex; gap: 10px; margin-top: 15px; }
-        .copy-box input { flex-grow: 1; font-family: monospace; font-size: 14px; cursor: text; }
-        .btn-copy { background: #444; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: 0.2s; }
-        .btn-copy:hover { background: #555; }
-        .btn-copy.success { background: #00ffcc; color: #000; }
-        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #00ffcc; color: #000; padding: 12px 24px; border-radius: 8px; font-weight: bold; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        .toast.show { opacity: 1; }
+        .card { 
+            background: var(--bg-card); 
+            padding: 24px; 
+            border-radius: var(--radius); 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            margin-bottom: 24px; 
+        }
+
+        /* Forms & Inputs */
+        .form-group { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 16px; 
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .form-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .form-group.col { flex-direction: column; align-items: stretch; gap: 8px; }
+        
+        label { font-weight: 500; font-size: 0.95rem; }
+        .help-text { font-size: 0.8rem; color: var(--text-muted); margin-top: -4px; }
+
+        input[type="text"], select { 
+            width: 100%; 
+            padding: 10px 14px; 
+            box-sizing: border-box; 
+            background: var(--bg-input); 
+            border: 1px solid var(--border); 
+            color: var(--text-main); 
+            border-radius: 8px; 
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        input[type="text"]:focus, select:focus { border-color: var(--accent); }
+
+        /* Custom Color Picker */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            padding: 0;
+            overflow: hidden;
+            cursor: pointer;
+            background: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; box-shadow: 0 0 0 1px var(--border) inset; }
+
+        /* Custom Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-input); transition: .3s; border-radius: 24px; border: 1px solid var(--border); }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: var(--text-muted); transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); border-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); background-color: #000; }
+
+        /* Buttons */
+        .btn { 
+            background: var(--bg-input); 
+            color: var(--text-main); 
+            border: 1px solid var(--border); 
+            padding: 12px 20px; 
+            font-size: 1rem; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            width: 100%; 
+            font-weight: 600; 
+            transition: all 0.2s; 
+        }
+        .btn:hover { background: #3a3a45; }
+        .btn-save { background: var(--accent); color: #000; border: none; margin-top: 16px; box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);}
+        .btn-save:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-danger-outline { background: transparent; color: var(--danger); border: 1px solid rgba(255,68,68,0.3); margin-top: 24px;}
+        .btn-danger-outline:hover { background: rgba(255,68,68,0.1); border-color: var(--danger); }
+
+        /* OBS Copy Box */
+        .copy-box { display: flex; gap: 8px; margin-top: 12px; }
+        .copy-box input { font-family: monospace; font-size: 0.85rem; }
+        .btn-copy { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 0 16px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; white-space: nowrap;}
+        .btn-copy:hover { background: #3a3a45; }
+        .btn-copy.success { background: var(--accent); color: #000; border-color: var(--accent); }
+
+        /* Tabs */
+        .tabs { display: flex; background: var(--bg-base); border-radius: 8px; padding: 4px; margin-bottom: 20px; border: 1px solid var(--border);}
+        .tab-btn { flex: 1; padding: 10px; text-align: center; background: transparent; color: var(--text-muted); border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s; }
+        .tab-btn:hover { color: var(--text-main); }
+        .tab-btn.active { background: var(--bg-card); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        
+        .tab-pane { display: none; animation: fadeIn 0.3s ease; }
+        .tab-pane.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Toast */
+        .toast { position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--accent); color: #000; padding: 12px 24px; border-radius: 8px; font-weight: 600; opacity: 0; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none; z-index: 100; box-shadow: 0 8px 24px rgba(0,255,204,0.3);}
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
     <div class='card'>
         <h2>OBS Integration</h2>
-        <div class="help-text" style="text-align: center;">Add this as a Browser Source (Clear custom CSS)</div>
+        <div class="help-text">Add this URL as a Browser Source (Clear custom CSS)</div>
         <div class="copy-box">
             <input type="text" id="obs-url" readonly>
             <button class="btn-copy" onclick="copyURL()" id="copy-btn">Copy</button>
@@ -117,89 +226,177 @@ const char *configHTML = R"rawliteral(
 
     <div class='card'>
         <h2>Dashboard Controls</h2>
-        <form action='/reset' method='POST'>
-            <button class='btn' type='submit'>Reset Step Count</button>
-        </form>
+        <button class='btn' type='button' id='btn-reset-steps'>Reset Step Count</button>
     </div>
     
     <div class='card'>
-        <h2>Overlay Theme & Icons</h2>
-        <form action='/savetheme' method='POST'>
+        <h2>Overlay Settings</h2>
+        <form id='theme-form'>
             
-            <div class="form-group col">
-                <label>Still Icon (Emoji or URL)</label>
-                <div class="help-text">Leave blank to use default 🧍</div>
-                <input type="text" name="iconStill" value="%ISTILL%">
-            </div>
-            <div class="form-group col">
-                <label>Walk Icon (Emoji or URL)</label>
-                <div class="help-text">Leave blank to use default 🚶</div>
-                <input type="text" name="iconWalk" value="%IWALK%">
-            </div>
-            <div class="form-group col">
-                <label>Run Icon (Emoji or URL)</label>
-                <div class="help-text">Leave blank to use default 🏃</div>
-                <input type="text" name="iconRun" value="%IRUN%">
-            </div>
-            
-            <div style="height: 20px;"></div>
-
-            <div class="form-group">
-                <label>Background Color</label>
-                <input type="color" name="bgColor" value="%BG%">
-            </div>
-            <div class="form-group">
-                <label>Text Color</label>
-                <input type="color" name="textColor" value="%TEXT%">
-            </div>
-            <div class="form-group">
-                <label>Walk Highlight</label>
-                <input type="color" name="walkColor" value="%WALK%">
-            </div>
-            <div class="form-group">
-                <label>Run Highlight</label>
-                <input type="color" name="runColor" value="%RUN%">
+            <div class="form-group col" style="margin-bottom: 24px;">
+                <label>Active Overlay Mode</label>
+                <select name="overlayMode" id="mode-select">
+                    <option value="0" %MODE0%>Simple (Counter Only)</option>
+                    <option value="1" %MODE1%>Standard (HUD)</option>
+                    <option value="2" %MODE2%>Advanced (HUD + Stats)</option>
+                </select>
             </div>
 
-            <div style="height: 10px;"></div>
-
-            <div class="form-group">
-                <label>Enable Greyscale (Inactive Status)</label>
-                <input type="checkbox" name="grey" %GREY%>
-            </div>
-            <div class="form-group">
-                <label>Enable Active Glow</label>
-                <input type="checkbox" name="glow" %GLOW%>
+            <div class="tabs">
+                <button class="tab-btn active" data-target="tab-simple">Simple Design</button>
+                <button class="tab-btn" data-target="tab-hud">HUD Design</button>
             </div>
 
-            <button class='btn btn-save' type='submit'>Save Settings</button>
+            <div id="tab-simple" class="tab-pane active">
+                <div class="form-group col">
+                    <label>Font Family</label>
+                    <div class="help-text">Available Google Font name (e.g. 'Roboto', 'Inter')</div>
+                    <input type="text" name="simpleFont" value="%SFONT%">
+                </div>
+                <div class="form-group">
+                    <label>Counter Color</label>
+                    <input type="color" name="simpleColor" value="%SCOLOR%">
+                </div>
+            </div>
+
+            <div id="tab-hud" class="tab-pane">
+                <div class="form-group col">
+                    <label>Still Icon</label>
+                    <div class="help-text">Emoji or direct image URL (Leave blank for 🧍)</div>
+                    <input type="text" name="iconStill" value="%ISTILL%">
+                </div>
+                <div class="form-group col">
+                    <label>Walk Icon</label>
+                    <div class="help-text">Emoji or direct image URL (Leave blank for 🚶)</div>
+                    <input type="text" name="iconWalk" value="%IWALK%">
+                </div>
+                <div class="form-group col">
+                    <label>Run Icon</label>
+                    <div class="help-text">Emoji or direct image URL (Leave blank for 🏃)</div>
+                    <input type="text" name="iconRun" value="%IRUN%">
+                </div>
+                
+                <div class="form-group">
+                    <label>Background</label>
+                    <input type="color" name="bgColor" value="%BG%">
+                </div>
+                <div class="form-group">
+                    <label>Main Text</label>
+                    <input type="color" name="textColor" value="%TEXT%">
+                </div>
+                <div class="form-group">
+                    <label>Walk Highlight</label>
+                    <input type="color" name="walkColor" value="%WALK%">
+                </div>
+                <div class="form-group">
+                    <label>Run Highlight</label>
+                    <input type="color" name="runColor" value="%RUN%">
+                </div>
+
+                <div class="form-group">
+                    <div class="col">
+                        <label>Enable Greyscale</label>
+                        <div class="help-text">Mutes icons when standing still</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="grey" %GREY%>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <div class="col">
+                        <label>Enable Active Glow</label>
+                        <div class="help-text">Adds neon drop-shadow when moving</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="glow" %GLOW%>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <button class='btn btn-save' type='submit' id='btn-save'>Save & Apply Settings</button>
         </form>
+        
+        <button class='btn btn-danger-outline' type='button' id='btn-reset-config'>Factory Reset Overlay</button>
     </div>
 
-    <div class="toast" id="toast">Settings Saved!</div>
+    <div class="toast" id="toast">Message</div>
+
     <script>
         const urlInput = document.getElementById('obs-url');
         urlInput.value = 'http://' + window.location.hostname + '/overlay';
 
-        if (new URLSearchParams(window.location.search).get('saved')) {
+        function showToast(msg) {
             const t = document.getElementById('toast');
+            t.innerText = msg;
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
-            history.replaceState({}, '', '/');
         }
 
         function copyURL() {
             urlInput.select();
-            urlInput.setSelectionRange(0, 99999);
             document.execCommand('copy');
             const btn = document.getElementById('copy-btn');
             btn.innerText = 'Copied!';
             btn.classList.add('success');
-            setTimeout(() => {
-                btn.innerText = 'Copy';
-                btn.classList.remove('success');
-            }, 2000);
+            setTimeout(() => { btn.innerText = 'Copy'; btn.classList.remove('success'); }, 2000);
         }
+
+        // Tab Switching Logic
+        function switchTab(targetId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelector(`[data-target="${targetId}"]`).classList.add('active');
+            document.getElementById(targetId).classList.add('active');
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchTab(btn.dataset.target);
+            });
+        });
+
+        // Smart dropdown: changing mode automatically flips to the relevant tab
+        const modeSelect = document.getElementById('mode-select');
+        modeSelect.addEventListener('change', (e) => {
+            if (e.target.value === "0") switchTab('tab-simple');
+            else switchTab('tab-hud');
+        });
+
+        // Initialize correct tab on load based on saved mode
+        if (modeSelect.value !== "0") switchTab('tab-hud');
+
+        // Async Save Settings
+        document.getElementById('theme-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-save');
+            const originalText = btn.innerText;
+            btn.innerText = 'Saving...';
+            
+            fetch('/savetheme', { method: 'POST', body: new FormData(this) })
+                .then(response => {
+                    btn.innerText = originalText;
+                    if(response.ok) showToast("Settings Applied!");
+                }).catch(() => { btn.innerText = originalText; });
+        });
+
+        // Async Reset Steps
+        document.getElementById('btn-reset-steps').addEventListener('click', function() {
+            fetch('/reset', { method: 'POST' }).then(response => {
+                if(response.ok) showToast("Step Count Reset!");
+            });
+        });
+
+        // Async Reset Customizations
+        document.getElementById('btn-reset-config').addEventListener('click', function() {
+            if(confirm("Are you sure you want to revert all overlay settings to default?")) {
+                fetch('/resetconfig', { method: 'POST' }).then(response => {
+                    if(response.ok) window.location.reload(); 
+                });
+            }
+        });
     </script>
 </body>
 </html>
@@ -210,38 +407,112 @@ const char *overlayHTML = R"rawliteral(
 <html>
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap">
-    <link rel="stylesheet" href="/theme.css">
     <style>
-        body { margin: 0; padding: 20px; background-color: transparent; font-family: 'Inter', sans-serif; color: var(--text-color); }
-        .hud-container { display: inline-flex; align-items: center; background: var(--bg-color); border-radius: 16px; padding: 12px 24px; gap: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
-        .metric { display: flex; align-items: center; gap: 12px; }
-        .step-value { font-size: 42px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
-        .step-label { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
-        .divider { width: 2px; height: 40px; background: var(--text-color); opacity: 0.1; border-radius: 2px; }
-        .status-icon { display: flex; align-items: center; justify-content: center; font-size: 32px; line-height: 1; opacity: 0.3; transition: all 0.3s ease; }
+        %DYNAMIC_CSS%
+        /* Reactivity Engine: 1rem dynamically scales based on OBS Browser Source width */
+
+        html { font-size: 4vw; width: 100%; height: 100%; } 
+        
+        body { 
+            margin: 0; 
+            padding: 1.25rem; 
+            background-color: transparent; 
+            color: var(--text-color); 
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+            
+            /* Centering Magic */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Kills weird phantom OBS scrollbars */
+        }
+        
+        /* App Container visibility logic */
+        #app.mode-0 .widget-wrapper { display: none !important; }
+        #app.mode-1 .simple-mode, #app.mode-1 .advanced-panel { display: none !important; }
+        #app.mode-2 .simple-mode { display: none !important; }
+
+        /* Simple Mode */
+        .simple-mode { font-size: 4rem; font-weight: bold; text-shadow: 0.125rem 0.125rem 0.25rem rgba(0,0,0,0.5); }
+
+        /* Unified Widget Wrapper */
+        .widget-wrapper {
+            display: inline-flex;
+            flex-direction: column;
+            background: var(--bg-color);
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+            width: fit-content;
+            overflow: hidden; /* Keeps the canvas nicely clipped to the bottom rounded corners */
+        }
+
+        /* Standard HUD (Top Section) */
+        .hud-container { 
+            display: flex; 
+            align-items: center; 
+            padding: 0.75rem 1.5rem; 
+            gap: 1.5rem; 
+        }
+        .metric { display: flex; align-items: center; gap: 0.75rem; }
+        .step-value { font-size: 2.625rem; font-weight: 800; letter-spacing: -0.0625rem; line-height: 1; }
+        .step-label { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.0625rem; opacity: 0.6; }
+        .divider { width: 0.125rem; height: 2.5rem; background: var(--text-color); opacity: 0.1; border-radius: 0.125rem; }
+        .status-icon { display: flex; align-items: center; justify-content: center; font-size: 2.75rem; line-height: 1; opacity: 0.3; transition: all 0.3s ease; }
+        .emote { height: 3.5rem; width: auto; max-width: 3.5rem; object-fit: contain; }
         .status-icon.active-walk { opacity: 1; }
         .status-icon.active-run { opacity: 1; }
-        .emote { height: 48px; width: auto; max-width: 48px; object-fit: contain; }
-        .battery-warning { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: #ff4444; background: rgba(255, 68, 68, 0.15); padding: 6px 12px; border-radius: 8px; animation: pulse 2s infinite; }
+        .emote { height: 3rem; width: auto; max-width: 3rem; object-fit: contain; }
+        .battery-warning { display: none; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 800; color: #ff4444; background: rgba(255, 68, 68, 0.15); padding: 0.375rem 0.75rem; border-radius: 0.5rem; animation: pulse 2s infinite; }
         .battery-warning.show-warning { display: flex; }
+        
+        /* Advanced Panel (Bottom Section) */
+        .advanced-panel { 
+            padding: 0 1.5rem 1.25rem 1.5rem; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .stats-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: bold; opacity: 0.7; margin-bottom: 0.5rem; text-transform: uppercase;}
+        
+        /* Chart takes up full container width visually, but internal resolution is high for crisp lines */
+        canvas { background: rgba(0,0,0,0.2); border-radius: 0.25rem; width: 100%; height: auto; aspect-ratio: 11/3; display: block;}
+        
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
-    <div class="hud-container">
-        <div class="metric">
-            <div class="step-value" id="steps">0</div>
-            <div class="step-label">Steps</div>
-        </div>
-        <div class="divider"></div>
-        <div class="metric">
-            <div class="status-icon" id="activity">🧍</div>
-        </div>
-        <div class="battery-warning" id="battery-status">
-            <span>🪫</span><span>LOW</span>
+    <div id="app" class="mode-%OVERLAY_MODE%">
+        
+        <div class="simple-mode" id="simple-steps" style="font-family: '%SFONT%'; color: %SCOLOR%;">0</div>
+
+        <div class="widget-wrapper">
+            
+            <div class="hud-container">
+                <div class="metric">
+                    <div class="step-value" id="steps">0</div>
+                    <div class="step-label">Steps</div>
+                </div>
+                <div class="divider"></div>
+                <div class="metric">
+                    <div class="status-icon" id="activity">🧍</div>
+                </div>
+                <div class="battery-warning" id="battery-status">
+                    <span>🪫</span><span>LOW</span>
+                </div>
+            </div>
+
+            <div class="advanced-panel">
+                <div class="stats-row">
+                    <span>Activity Rate (Last 2m) </span>
+                    <span id="spm">0 SPM</span>
+                </div>
+                <canvas id="stepChart" width="440" height="120"></canvas>
+            </div>
+
         </div>
     </div>
     
@@ -256,46 +527,81 @@ const char *overlayHTML = R"rawliteral(
         function dbg(...args) { if (DEBUG) console.log('[stepstick]', ...args); }
 
         const stepsEl = document.getElementById('steps');
+        const simpleStepsEl = document.getElementById('simple-steps');
         const activityEl = document.getElementById('activity');
         const batteryStatus = document.getElementById('battery-status');
+        const spmEl = document.getElementById('spm');
+        
+        // Chart logic
+        const canvas = document.getElementById('stepChart');
+        const ctx = canvas.getContext('2d');
+        const chartData = new Array(24).fill(0); // 24 data points
+        let currentTotalSteps = 0;
+        let lastIntervalSteps = 0;
 
+        function updateChart() {
+            // Calculate delta every 5 seconds (24 points = 2 mins history)
+            let delta = currentTotalSteps - lastIntervalSteps;
+            lastIntervalSteps = currentTotalSteps;
+            
+            chartData.shift();
+            chartData.push(delta);
+            
+            // Calculate Steps Per Minute (sum of last 12 points = 1 min)
+            let recentSum = chartData.slice(-12).reduce((a, b) => a + b, 0);
+            spmEl.innerText = recentSum + " SPM";
+
+            // Draw Chart
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let maxVal = Math.max(...chartData, 10); // Minimum scale of 10
+            
+            ctx.beginPath();
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--text-color');
+            ctx.lineWidth = 4; // Thickened slightly to account for the high internal resolution
+            
+            let xStep = canvas.width / (chartData.length - 1);
+            for(let i = 0; i < chartData.length; i++) {
+                let x = i * xStep;
+                let y = canvas.height - ((chartData[i] / maxVal) * canvas.height);
+                if(i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Fill area
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-color') + '22'; // 22 hex for transparency
+            ctx.fill();
+        }
+
+        setInterval(updateChart, 5000); // 5 second intervals
+
+        // WebSocket Logic
         let ws = null;
         let reconnectTimer = null;
 
         function connect() {
-            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-                dbg('connect() called but already open/connecting, skipping');
-                return;
-            }
             clearTimeout(reconnectTimer);
-
             const url = `ws://${window.location.hostname}:81/`;
-            dbg('connecting to', url);
-
-            try {
-                ws = new WebSocket(url);
-            } catch (e) {
-                dbg('WebSocket constructor threw:', e);
-                reconnectTimer = setTimeout(connect, 3000);
-                return;
+            try { ws = new WebSocket(url); } catch (e) {
+                reconnectTimer = setTimeout(connect, 3000); return;
             }
-
-            ws.onopen = () => dbg('connected');
 
             ws.onmessage = function(event) {
-                dbg('message:', event.data);
                 try {
                     const data = JSON.parse(event.data);
                     if (data.command === 'reload') { window.location.reload(); return; }
-                    if (data.steps !== undefined) stepsEl.innerText = data.steps;
+                    if (data.steps !== undefined) {
+                        stepsEl.innerText = data.steps;
+                        simpleStepsEl.innerText = data.steps;
+                        currentTotalSteps = data.steps;
+                        if(lastIntervalSteps === 0) lastIntervalSteps = data.steps; // init
+                    }
 
                     if (data.activity !== undefined) {
                         if (data.activity.startsWith("http")) {
-                            const img = document.createElement('img');
-                            img.src = data.activity;
-                            img.className = 'emote';
-                            activityEl.innerHTML = '';
-                            activityEl.appendChild(img);
+                            activityEl.innerHTML = `<img src="${data.activity}" class="emote">`;
                         } else {
                             activityEl.innerText = data.activity;
                         }
@@ -311,18 +617,10 @@ const char *overlayHTML = R"rawliteral(
                         if (data.battery <= 15) batteryStatus.classList.add('show-warning');
                         else batteryStatus.classList.remove('show-warning');
                     }
-                } catch (e) { console.error('[stepstick] JSON parse error', e, event.data); }
+                } catch (e) {}
             };
-
-            ws.onerror = (e) => dbg('error', e);
-
-            ws.onclose = (e) => {
-                dbg('closed — code:', e.code, 'reason:', e.reason, 'clean:', e.wasClean);
-                ws = null;
-                reconnectTimer = setTimeout(connect, 2000);
-            };
+            ws.onclose = () => { ws = null; reconnectTimer = setTimeout(connect, 2000); };
         }
-
         connect();
     </script>
 </body>
@@ -332,9 +630,17 @@ const char *overlayHTML = R"rawliteral(
 // --- WEB ROUTE HANDLERS ---
 void handleRoot() {
   String html;
-  html.reserve(strlen(configHTML) + 512);
+  html.reserve(strlen(configHTML) + 700);
   html = configHTML;
 
+  // Insert mode selection states
+  html.replace("%MODE0%", overlayMode == 0 ? "selected" : "");
+  html.replace("%MODE1%", overlayMode == 1 ? "selected" : "");
+  html.replace("%MODE2%", overlayMode == 2 ? "selected" : "");
+  html.replace("%SCOLOR%", simpleColor);
+  html.replace("%SFONT%", simpleFont);
+
+  // Existing theme replacements
   html.replace("%BG%", themeBgColor);
   html.replace("%TEXT%", themeTextColor);
   html.replace("%WALK%", themeWalkColor);
@@ -342,14 +648,51 @@ void handleRoot() {
   html.replace("%ISTILL%", iconStill);
   html.replace("%IWALK%", iconWalk);
   html.replace("%IRUN%", iconRun);
-
   html.replace("%GREY%", themeGreyscale ? "checked" : "");
   html.replace("%GLOW%", themeGlow ? "checked" : "");
 
   server.send(200, "text/html", html);
 }
 
-void handleOverlay() { server.send(200, "text/html", overlayHTML); }
+void handleOverlay() {
+  String html;
+  html.reserve(strlen(overlayHTML) + 512);
+  html = overlayHTML;
+
+  html.replace("%OVERLAY_MODE%", String(overlayMode));
+  html.replace("%SFONT%", simpleFont);
+  html.replace("%SCOLOR%", simpleColor);
+
+  String dynamicCSS = ":root {\n";
+  dynamicCSS += "--bg-color: " + themeBgColor + "e6;\n"; // e6 adds 90% opacity
+  dynamicCSS += "--text-color: " + themeTextColor + ";\n";
+  dynamicCSS += "--walk-color: " + themeWalkColor + ";\n";
+  dynamicCSS += "--run-color: " + themeRunColor + ";\n";
+  dynamicCSS += "}\n";
+
+  dynamicCSS += ".status-icon { ";
+  if (themeGreyscale)
+    dynamicCSS += "filter: grayscale(100%); ";
+  dynamicCSS += "}\n";
+
+  String walkFilter = themeGreyscale ? "grayscale(0%) " : "";
+  String runFilter = themeGreyscale ? "grayscale(0%) " : "";
+
+  if (themeGlow) {
+    walkFilter += "drop-shadow(0 0 0.5rem var(--walk-color))";
+    runFilter += "drop-shadow(0 0 0.5rem var(--run-color))";
+  } else if (!themeGreyscale) {
+    walkFilter = "none";
+    runFilter = "none";
+  }
+
+  dynamicCSS += ".status-icon.active-walk { filter: " + walkFilter + "; }\n";
+  dynamicCSS += ".status-icon.active-run { filter: " + runFilter + "; }\n";
+
+  html.replace("%DYNAMIC_CSS%", dynamicCSS);
+
+  server.send(200, "text/html", html);
+}
 
 void handleThemeCSS() {
   char css[768];
@@ -409,6 +752,22 @@ bool isValidHexColor(const String &s) {
 }
 
 void handleSaveTheme() {
+  if (server.hasArg("overlayMode")) {
+    overlayMode = server.arg("overlayMode").toInt();
+    prefs.putInt("mode", overlayMode);
+  }
+  if (server.hasArg("simpleFont")) {
+    simpleFont = server.arg("simpleFont");
+    prefs.putString("sfont", simpleFont);
+  }
+  if (server.hasArg("simpleColor")) {
+    String v = server.arg("simpleColor");
+    if (isValidHexColor(v)) {
+      simpleColor = v;
+      prefs.putString("scolor", simpleColor);
+    }
+  }
+
   if (server.hasArg("bgColor")) {
     String v = server.arg("bgColor");
     if (isValidHexColor(v)) {
@@ -463,7 +822,7 @@ void handleSaveTheme() {
   webSocket.broadcastTXT("{\"command\":\"reload\"}");
 
   server.sendHeader("Location", "/?saved=1");
-  server.send(303);
+  server.send(200, "text/plain", "OK");
 }
 
 void handleReset() {
@@ -471,7 +830,7 @@ void handleReset() {
   displaySteps = 0;
   lastBroadcastSteps = 0;
   server.sendHeader("Location", "/");
-  server.send(303);
+  server.send(200, "text/plain", "OK");
 }
 
 void wakeScreen() {
@@ -504,12 +863,12 @@ bool connectToWifi(const char *ssid, const char *password) {
 }
 
 // --- MAIN FIRMWARE ---
-void setup() {
-  auto cfg = M5.config();
-  M5.begin(cfg);
-  setCpuFrequencyMhz(80);
 
-  prefs.begin("theme", false);
+void loadPreferences() {
+  overlayMode = prefs.getInt("mode", 1);
+  simpleFont = prefs.getString("sfont", "Inter");
+  simpleColor = prefs.getString("scolor", "#ffffff");
+
   themeBgColor = prefs.getString("bg", "#0f0f14");
   themeTextColor = prefs.getString("text", "#ffffff");
   themeWalkColor = prefs.getString("walk", "#00ffcc");
@@ -521,6 +880,26 @@ void setup() {
 
   themeGlow = prefs.getBool("glow", true);
   themeGreyscale = prefs.getBool("grey", true);
+}
+
+void handleResetConfig() {
+  prefs.clear();
+
+  loadPreferences();
+
+  webSocket.broadcastTXT("{\"command\":\"reload\"}");
+
+  server.send(200, "text/plain", "OK");
+}
+
+void setup() {
+  auto cfg = M5.config();
+  M5.begin(cfg);
+  setCpuFrequencyMhz(80);
+
+  prefs.begin("theme", false);
+
+  loadPreferences();
 
   M5.Display.setRotation(3);
   M5.Display.fillScreen(TFT_BLACK);
@@ -591,6 +970,7 @@ void setup() {
   server.on("/theme.css", HTTP_GET, handleThemeCSS);
   server.on("/savetheme", HTTP_POST, handleSaveTheme);
   server.on("/reset", HTTP_POST, handleReset);
+  server.on("/resetconfig", HTTP_POST, handleResetConfig);
   server.begin();
 
   lastInteractionTime = millis();
