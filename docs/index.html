@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StepStick — Stream Pedometer</title>
+  <meta name="description" content="A step-counter overlay for live streamers. Runs on M5Stack StickS3 and integrates with OBS via browser source.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+  <div class="nav-links">
+    <a href="./index.html" class="active">Home</a>
+    <a href="./setup.html">Get Started</a>
+    <a href="./technical.html">Technical</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <span class="hero-icon">🦶</span>
+  <h1>Step<span>Stick</span></h1>
+  <p>A live step-counter overlay for streamers. Wear your M5StickS3, walk around, and your audience sees every step in real time.</p>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="./flash.html">⚡ Flash Firmware</a>
+    <a class="btn btn-secondary" href="./setup.html">Setup Guide</a>
+    <a class="btn btn-secondary" href="https://github.com/jhlwscom/stepstick">GitHub</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">📡</div>
+      <h2>Real-time overlay</h2>
+      <p>Step count and activity state stream live to OBS via WebSocket — zero delay, zero plugins.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🎨</div>
+      <h2>Fully themeable</h2>
+      <p>Customise colours, icons, glow effects, and greyscale transitions directly from the on-device web UI.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🏃</div>
+      <h2>Activity detection</h2>
+      <p>The BMI270 IMU distinguishes Still, Walking, and Running states and reflects them in the overlay automatically.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔋</div>
+      <h2>Battery aware</h2>
+      <p>A low-battery warning appears in the overlay when charge drops below 15 %, and the display sleeps after 15 s of inactivity.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🌐</div>
+      <h2>Browser flash</h2>
+      <p>No toolchain needed. Flash firmware straight from your browser over USB with esp-web-tools.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📶</div>
+      <h2>Easy WiFi setup</h2>
+      <p>Provision WiFi credentials over USB serial with the Improv protocol — no app, no pairing mode.</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">How it works</h2>
+
+  <ol class="steps">
+    <li>
+      <div class="step-body">
+        <h3>Flash the firmware</h3>
+        <p>Connect your M5StickS3 via USB and use the <a href="./flash.html">browser flasher</a> to install the firmware in one click.</p>
+      </div>
+    </li>
+    <li>
+      <div class="step-body">
+        <h3>Provision WiFi</h3>
+        <p>Use any Improv-compatible tool (or the <a href="https://www.improv-wifi.com">Improv web app</a>) to send your WiFi credentials over USB serial. The device IP is shown on screen once connected.</p>
+      </div>
+    </li>
+    <li>
+      <div class="step-body">
+        <h3>Open the config page</h3>
+        <p>Navigate to <code>http://stepcounter.local</code> (or the IP on screen) to customise your overlay theme and copy the OBS browser-source URL.</p>
+      </div>
+    </li>
+    <li>
+      <div class="step-body">
+        <h3>Add to OBS</h3>
+        <p>Paste the overlay URL as a Browser Source in OBS. Set a transparent background (clear the Custom CSS field) and resize to taste.</p>
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <span>After saving theme changes the overlay reloads automatically — no need to refresh OBS.</span>
+  </div>
+
+</div>
+
+<footer>
+  <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
+  MIT License
+</footer>
+
+</body>
+</html>

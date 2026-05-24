@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-json.schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "platformio": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchDatasources": ["platformio", "github-tags"],
+      "pinDigests": true,
+      "stabilityDays": 14,
+      "automerge": false,
+      "groupName": "Monthly Dependencies",
+      "schedule": ["every month on the first day"]
+    }
+  ]
+}

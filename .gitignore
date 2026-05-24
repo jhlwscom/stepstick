@@ -1,0 +1,27 @@
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# --- PlatformIO ---
+.pio/
+.clangd/
+compile_commands.json
+.pioenvs/
+.piolibdeps/
+
+# --- Build Artifacts ---
+build/
+*.bin
+*.elf
+*.map
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# --- Secrets / Env ---
+.env
+*.local

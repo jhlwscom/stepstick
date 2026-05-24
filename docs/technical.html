@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Technical Reference — StepStick</title>
+  <meta name="description" content="HTTP endpoints, WebSocket API, hardware specs, and theme system for StepStick.">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+  <nav>
+    <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+    <div class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./setup.html">Get Started</a>
+      <a href="./technical.html" class="active">Technical</a>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">Technical Reference</h1>
+    <p style="color:var(--muted); margin-bottom:40px;">HTTP API, WebSocket protocol, hardware details, and theme
+      internals.</p>
+
+    <!-- ── Hardware ── -->
+    <h2 class="section-title">Hardware</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Board</td>
+            <td>M5Stack StickS3 (ESP32-S3)</td>
+          </tr>
+          <tr>
+            <td>MCU</td>
+            <td>ESP32-S3 — dual-core Xtensa LX7, 240 MHz</td>
+          </tr>
+          <tr>
+            <td>Flash</td>
+            <td>8 MB (default_8MB partition table)</td>
+          </tr>
+          <tr>
+            <td>PSRAM</td>
+            <td>8 MB OPI PSRAM</td>
+          </tr>
+          <tr>
+            <td>IMU</td>
+            <td>Bosch BMI270 via I²C (Wire1, 400 kHz)</td>
+          </tr>
+          <tr>
+            <td>Display</td>
+            <td>Built-in LCD, rotation 3 (landscape)</td>
+          </tr>
+          <tr>
+            <td>WiFi</td>
+            <td>802.11 b/g/n 2.4 GHz only</td>
+          </tr>
+          <tr>
+            <td>USB</td>
+            <td>USB-C, CDC-on-boot enabled</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Firmware ── -->
+    <h2 class="section-title" style="margin-top:40px;">Firmware</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Version</td>
+            <td>1.0.0</td>
+          </tr>
+          <tr>
+            <td>Platform</td>
+            <td>espressif32 @ 6.12.0</td>
+          </tr>
+          <tr>
+            <td>Framework</td>
+            <td>Arduino</td>
+          </tr>
+          <tr>
+            <td>mDNS hostname</td>
+            <td><code>stepcounter.local</code></td>
+          </tr>
+          <tr>
+            <td>WiFi provisioning</td>
+            <td>Improv over USB serial</td>
+          </tr>
+          <tr>
+            <td>Settings storage</td>
+            <td>ESP32 Preferences (NVS), namespace <code>theme</code></td>
+          </tr>
+          <tr>
+            <td>Screen timeout</td>
+            <td>15 seconds of inactivity</td>
+          </tr>
+          <tr>
+            <td>Battery poll interval</td>
+            <td>30 seconds</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── HTTP Endpoints ── -->
+    <h2 class="section-title" style="margin-top:40px;">HTTP Endpoints</h2>
+    <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">All endpoints are served on port
+      <strong>80</strong>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Path</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-get">GET</span></td>
+            <td><code>/</code></td>
+            <td>Configuration UI with theme editor and OBS URL helper</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-get">GET</span></td>
+            <td><code>/overlay</code></td>
+            <td>Overlay HTML — use this as the OBS Browser Source URL</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-get">GET</span></td>
+            <td><code>/theme.css</code></td>
+            <td>Dynamically generated CSS with current theme variables; fetched by the overlay on load</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-post">POST</span></td>
+            <td><code>/savetheme</code></td>
+            <td>Persist theme settings. Broadcasts a <code>reload</code> command to all WebSocket clients, then
+              redirects to <code>/?saved=1</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-post">POST</span></td>
+            <td><code>/reset</code></td>
+            <td>Reset the displayed step count. Redirects to <code>/</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── WebSocket ── -->
+    <h2 class="section-title" style="margin-top:40px;">WebSocket API</h2>
+    <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">The device runs a WebSocket server on port
+      <strong>81</strong>. The overlay connects to <code>ws://&lt;device-ip&gt;:81/</code> and reconnects automatically
+      on disconnect.</p>
+
+    <h3 style="font-size:1rem; font-weight:700; margin-bottom:10px;">Server → Client messages</h3>
+    <p style="color:var(--muted); font-size:0.93rem; margin-bottom:10px;">Sent immediately on connect, and again
+      whenever step count or activity state changes.</p>
+
+    <pre><code>{
+  "steps": 1234,       // current displayed step count (integer)
+  "state": 1,          // activity state: 0=STILL, 1=WALKING, 2=RUNNING
+  "activity": "🚶",    // icon string — emoji or image URL depending on theme
+  "battery": 82        // battery percentage (0–100), polled every 30 s
+}</code></pre>
+
+    <p style="color:var(--muted); font-size:0.93rem; margin:14px 0 10px;">Also sent when theme is saved:</p>
+
+    <pre><code>{ "command": "reload" }   // instructs overlay to reload the page</code></pre>
+
+    <div class="callout tip" style="margin-top:4px;">
+      <span class="callout-icon">💡</span>
+      <span>The overlay only broadcasts when <code>steps</code> or <code>state</code> actually changes, so there is no
+        polling traffic during idle periods.</span>
+    </div>
+
+    <!-- ── Activity States ── -->
+    <h2 class="section-title" style="margin-top:40px;">Activity States</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Value</th>
+            <th>Name</th>
+            <th>Default icon</th>
+            <th>CSS class on overlay</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>0</code></td>
+            <td>STILL</td>
+            <td>🧍</td>
+            <td>(none — opacity 0.3)</td>
+          </tr>
+          <tr>
+            <td><code>1</code></td>
+            <td>WALKING</td>
+            <td>🚶</td>
+            <td><code>active-walk</code></td>
+          </tr>
+          <tr>
+            <td><code>2</code></td>
+            <td>RUNNING</td>
+            <td>🏃</td>
+            <td><code>active-run</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="color:var(--muted); font-size:0.93rem; margin-top:12px;">Activity values come directly from the BMI270
+      step-activity feature. The sensor only transitions <em>from</em> STILL when motion begins; it never re-reports
+      STILL once motion has started during a session (the firmware preserves the last active state).</p>
+
+    <!-- ── Theme System ── -->
+    <h2 class="section-title" style="margin-top:40px;">Theme System</h2>
+    <p style="color:var(--muted); font-size:0.93rem; margin-bottom:16px;">Theme values are stored in NVS and served as
+      CSS custom properties via <code>/theme.css</code>. The overlay loads this stylesheet on every page load.</p>
+
+    <h3 style="font-size:1rem; font-weight:700; margin-bottom:10px;">CSS custom properties</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>--bg-color</code></td>
+            <td><code>#0f0f14e6</code></td>
+            <td>HUD background (background colour + <code>e6</code> alpha suffix for 90 % opacity)</td>
+          </tr>
+          <tr>
+            <td><code>--text-color</code></td>
+            <td><code>#ffffff</code></td>
+            <td>Step count and label text</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:1rem; font-weight:700; margin:20px 0 10px;">NVS preference keys</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Type</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>bg</code></td>
+            <td>String</td>
+            <td><code>#0f0f14</code></td>
+            <td>HUD background colour</td>
+          </tr>
+          <tr>
+            <td><code>text</code></td>
+            <td>String</td>
+            <td><code>#ffffff</code></td>
+            <td>Text colour</td>
+          </tr>
+          <tr>
+            <td><code>walk</code></td>
+            <td>String</td>
+            <td><code>#00ffcc</code></td>
+            <td>Walk highlight colour</td>
+          </tr>
+          <tr>
+            <td><code>run</code></td>
+            <td>String</td>
+            <td><code>#ff4444</code></td>
+            <td>Run highlight colour</td>
+          </tr>
+          <tr>
+            <td><code>istill</code></td>
+            <td>String</td>
+            <td>(empty → 🧍)</td>
+            <td>Still icon: emoji or URL</td>
+          </tr>
+          <tr>
+            <td><code>iwalk</code></td>
+            <td>String</td>
+            <td>(empty → 🚶)</td>
+            <td>Walk icon: emoji or URL</td>
+          </tr>
+          <tr>
+            <td><code>irun</code></td>
+            <td>String</td>
+            <td>(empty → 🏃)</td>
+            <td>Run icon: emoji or URL</td>
+          </tr>
+          <tr>
+            <td><code>glow</code></td>
+            <td>Bool</td>
+            <td><code>true</code></td>
+            <td>Drop-shadow glow on active state</td>
+          </tr>
+          <tr>
+            <td><code>grey</code></td>
+            <td>Bool</td>
+            <td><code>true</code></td>
+            <td>Greyscale filter on inactive state</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Dependencies ── -->
+    <h2 class="section-title" style="margin-top:40px;">Dependencies</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Library</th>
+            <th>Version</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>M5Unified</td>
+            <td>0.2.15</td>
+            <td>Hardware abstraction for M5Stack devices</td>
+          </tr>
+          <tr>
+            <td>M5PM1</td>
+            <td>1.0.6</td>
+            <td>Power management</td>
+          </tr>
+          <tr>
+            <td>SparkFun BMI270</td>
+            <td>1.0.3</td>
+            <td>Step counter and activity detection</td>
+          </tr>
+          <tr>
+            <td>Improv WiFi Library</td>
+            <td>0.0.4</td>
+            <td>USB serial WiFi provisioning</td>
+          </tr>
+          <tr>
+            <td>WebSockets (links2004)</td>
+            <td>2.4.1</td>
+            <td>WebSocket server on port 81</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <footer>
+    <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
+    MIT License
+  </footer>
+
+</body>
+
+</html>
