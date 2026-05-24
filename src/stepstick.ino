@@ -665,17 +665,39 @@ void loop() {
 
   static unsigned long lastDisplayUpdate = 0;
   if (isScreenOn && millis() - lastDisplayUpdate > 100) {
+    // --- 1. Draw Steps (Center) ---
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     M5.Display.setTextDatum(middle_center);
     M5.Display.setFont(&fonts::FreeSansBold24pt7b);
     M5.Display.drawString(String(displaySteps) + "   ", M5.Display.width() / 2,
                           M5.Display.height() / 2 - 5);
 
+    // --- 2. Draw IP Address (Bottom) ---
     M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
     M5.Display.setTextDatum(bottom_center);
     M5.Display.setFont(&fonts::FreeSans9pt7b);
     M5.Display.drawString("http://" + WiFi.localIP().toString() + "  ",
                           M5.Display.width() / 2, M5.Display.height() - 5);
+
+    // --- 3. Draw Battery (Top Right) ---
+    if (batteryLevel <= 20) {
+      M5.Display.setTextColor(TFT_RED, TFT_BLACK);
+    } else {
+      M5.Display.setTextColor(TFT_GREEN, TFT_BLACK);
+    }
+    M5.Display.setTextDatum(top_right);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
+    M5.Display.drawString(String(batteryLevel) + "% ", M5.Display.width() - 5,
+                          5);
+
+    // --- 4. Draw CalVer Firmware Version (Top Left) ---
+    // Using a muted grey so it stays out of the way of the main metrics
+    M5.Display.setTextColor(TFT_DARKGRAY, TFT_BLACK);
+    M5.Display.setTextDatum(top_left);
+    M5.Display.setFont(&fonts::FreeSans9pt7b);
+    M5.Display.drawString(String("v") + FIRMWARE_VERSION, 5,
+                          5); // 5px padding from edge
+
     lastDisplayUpdate = millis();
   }
 }
