@@ -3,10 +3,11 @@ name: GitHub Pages
 on:
   push:
     branches: ["main"]
+    paths:
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
-  contents: write   # tag push + release creation
   pages: write
   id-token: write
 
@@ -15,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -23,83 +24,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history so we can query existing tags
 
-      # ── CalVer: YYYY.M.PATCH ──────────────────────────────────────────────
-      - name: Compute version
-        id: ver
-        run: |
-          YEAR=$(date -u +%Y)
-          MONTH=$(date -u +%-m)
-          PREFIX="${YEAR}.${MONTH}"
-          git fetch --tags
-          LAST=$(git tag -l "${PREFIX}.*" \
-            | sed "s/^${PREFIX}\.//" \
-            | grep -E '^[0-9]+$' \
-            | sort -n | tail -1)
-          PATCH=$(( ${LAST:--1} + 1 ))
-          VERSION="${PREFIX}.${PATCH}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building version ${VERSION}"
-
-      # ── Python / PlatformIO ───────────────────────────────────────────────
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: "pip"
-
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini') }}
-
-      - name: Install PlatformIO
-        run: pip install -r requirements.txt
-
-      # ── Stamp version into firmware ───────────────────────────────────────
-      - name: Stamp version.h
-        run: |
-          echo '#pragma once' > src/version.h
-          echo '#define FIRMWARE_VERSION "${{ steps.ver.outputs.version }}"' >> src/version.h
-
-      - name: Build firmware
-        run: pio run -e m5stack-sticks3
-
-      # ── Copy firmware binaries + update manifest ──────────────────────────
-      - name: Copy firmware binaries to docs
-        run: |
-          cp .pio/build/m5stack-sticks3/firmware.bin   docs/firmware.bin
-          cp .pio/build/m5stack-sticks3/bootloader.bin docs/bootloader.bin
-          cp .pio/build/m5stack-sticks3/partitions.bin docs/partition-table.bin
-
-      - name: Stamp manifest version
-        run: |
-          jq '.version = "${{ steps.ver.outputs.version }}"' \
-            docs/manifest.json > docs/manifest.tmp.json
-          mv docs/manifest.tmp.json docs/manifest.json
-
-      # ── Tag + GitHub Release ──────────────────────────────────────────────
-      - name: Create git tag
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.ver.outputs.version }}"
-          git push origin "${{ steps.ver.outputs.version }}"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.ver.outputs.version }}
-          name: ${{ steps.ver.outputs.version }}
-          files: |
-            .pio/build/m5stack-sticks3/firmware.bin
-            .pio/build/m5stack-sticks3/bootloader.bin
-            .pio/build/m5stack-sticks3/partitions.bin
-
-      # ── Deploy Pages ──────────────────────────────────────────────────────
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
