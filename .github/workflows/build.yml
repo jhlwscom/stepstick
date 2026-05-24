@@ -1,23 +1,69 @@
-name: PlatformIO CI
+name: Deploy
 
 on:
-  pull_request:
-    branches: [ "main" ]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  build:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      firmware: ${{ steps.filter.outputs.firmware }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Detect changed paths
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+             git diff --name-only HEAD~1 HEAD | grep -qE '^(src/|platformio\.ini|requirements\.txt)'; then
+            echo "firmware=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "firmware=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  firmware:
+    needs: changes
+    if: needs.changes.outputs.firmware == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: ver
+        run: |
+          YEAR=$(date -u +%Y)
+          MONTH=$(date -u +%-m)
+          PREFIX="${YEAR}.${MONTH}"
+          git fetch --tags
+          LAST=$(git tag -l "${PREFIX}.*" \
+            | sed "s/^${PREFIX}\.//" \
+            | grep -E '^[0-9]+$' \
+            | sort -n | tail -1)
+          PATCH=$(( ${LAST:--1} + 1 ))
+          echo "version=${PREFIX}.${PATCH}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
-          cache: 'pip'
+          python-version: "3.13"
+          cache: "pip"
 
       - name: Cache PlatformIO
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.platformio
           key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini') }}
@@ -25,14 +71,72 @@ jobs:
       - name: Install PlatformIO
         run: pip install -r requirements.txt
 
-      - name: Build Project
+      - name: Stamp version.h
+        run: |
+          echo '#pragma once' > src/version.h
+          echo '#define FIRMWARE_VERSION "${{ steps.ver.outputs.version }}"' >> src/version.h
+
+      - name: Build firmware
         run: pio run -e m5stack-sticks3
 
-      - name: Upload Firmware Artifact
-        uses: actions/upload-artifact@v4
+      - name: Tag release
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.ver.outputs.version }}"
+          git push origin "${{ steps.ver.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
         with:
-          name: firmware-bin
-          retention-days: 30
-          path: |
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          files: |
+            .pio/build/m5stack-sticks3/bootloader.bin
+            .pio/build/m5stack-sticks3/partitions.bin
             .pio/build/m5stack-sticks3/firmware.bin
-            .pio/build/m5stack-sticks3/firmware.elf
+
+      - name: Stage firmware for Pages
+        run: |
+          cp .pio/build/m5stack-sticks3/bootloader.bin docs/bootloader.bin
+          cp .pio/build/m5stack-sticks3/partitions.bin docs/partition-table.bin
+          cp .pio/build/m5stack-sticks3/firmware.bin   docs/firmware.bin
+          jq '.version = "${{ steps.ver.outputs.version }}"' \
+            docs/manifest.json > docs/manifest.tmp.json
+          mv docs/manifest.tmp.json docs/manifest.json
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-docs
+          path: |
+            docs/bootloader.bin
+            docs/partition-table.bin
+            docs/firmware.bin
+            docs/manifest.json
+
+  deploy:
+    needs: [changes, firmware]
+    if: always() && (needs.firmware.result == 'success' || needs.firmware.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download firmware artifact
+        if: needs.firmware.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: firmware-docs
+          path: docs/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
