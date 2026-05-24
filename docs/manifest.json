@@ -1,6 +1,6 @@
 {
   "name": "StepStick Stream Pedometer",
-  "version": "1.0.0",
+  "version": "dev",
   "home_assistant_domain": "esphome",
   "builds": [
     {
