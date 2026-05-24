@@ -15,7 +15,7 @@ Preferences prefs;
 ImprovWiFi improvSerial(&Serial);
 
 // --- Activity States (matches BMI270 sensor output) ---
-enum Activity : uint8_t { STILL = 0, WALKING = 1, RUNNING = 2 };
+enum Activity : uint8_t { STILL = 0, WALKING = 1, RUNNING = 2, UNKNOWN = 255 };
 
 // --- Step Logic Variables ---
 uint32_t hwStepCount = 0;
@@ -23,7 +23,7 @@ uint32_t stepOffset = 0;
 uint32_t displaySteps = 0;
 uint32_t lastBroadcastSteps = 0;
 Activity currentActivity = STILL;
-Activity lastActivity = (Activity)255;
+Activity lastActivity = UNKNOWN;
 String activityString = "🧍";
 int batteryLevel = 0;
 
@@ -45,16 +45,29 @@ String iconRun = "";
 bool themeGlow = true;
 bool themeGreyscale = true;
 
+// --- Helper: Secure JSON Generation ---
+String buildStateJson() {
+  // Prevent JSON injection by escaping quotes in the activity string
+  String escapedActivity = activityString;
+  escapedActivity.replace("\"", "\\\"");
+
+  char jsonBuffer[256];
+  snprintf(jsonBuffer, sizeof(jsonBuffer),
+           "{\"steps\":%lu,\"state\":%d,\"activity\":\"%s\",\"battery\":%d}",
+           displaySteps, currentActivity, escapedActivity.c_str(),
+           batteryLevel);
+  return String(jsonBuffer);
+}
+
 // --- WebSocket Event Handler ---
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
                     size_t length) {
+  (void)payload; // Silence unused parameter warnings
+  (void)length;
+
   if (type == WStype_CONNECTED) {
-    // Send the current known state to the newly connected client immediately
-    String json = "{\"steps\":" + String(displaySteps) +
-                  ",\"state\":" + String(currentActivity) + ",\"activity\":\"" +
-                  activityString + "\"" +
-                  ",\"battery\":" + String(batteryLevel) + "}";
-    webSocket.sendTXT(num, json);
+    String payload = buildStateJson();
+    webSocket.sendTXT(num, payload);
   }
 }
 
@@ -317,7 +330,10 @@ const char *overlayHTML = R"rawliteral(
 
 // --- WEB ROUTE HANDLERS ---
 void handleRoot() {
-  String html = configHTML;
+  String html;
+  html.reserve(strlen(configHTML) + 512);
+  html = configHTML;
+
   html.replace("%BG%", themeBgColor);
   html.replace("%TEXT%", themeTextColor);
   html.replace("%WALK%", themeWalkColor);
@@ -421,16 +437,18 @@ void handleSaveTheme() {
     }
   }
 
+  // Constrain input to 2048 chars to allow long URLs/Data URIs
+  // while preventing NVS storage overflows (NVS max is ~4000 bytes)
   if (server.hasArg("iconStill")) {
-    iconStill = server.arg("iconStill");
+    iconStill = server.arg("iconStill").substring(0, 2048);
     prefs.putString("istill", iconStill);
   }
   if (server.hasArg("iconWalk")) {
-    iconWalk = server.arg("iconWalk");
+    iconWalk = server.arg("iconWalk").substring(0, 2048);
     prefs.putString("iwalk", iconWalk);
   }
   if (server.hasArg("iconRun")) {
-    iconRun = server.arg("iconRun");
+    iconRun = server.arg("iconRun").substring(0, 2048);
     prefs.putString("irun", iconRun);
   }
 
@@ -457,6 +475,7 @@ void handleReset() {
 
 void wakeScreen() {
   if (!isScreenOn) {
+    M5.Display.wakeup();
     M5.Display.setBrightness(255);
     isScreenOn = true;
   }
@@ -487,6 +506,7 @@ bool connectToWifi(const char *ssid, const char *password) {
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+  setCpuFrequencyMhz(80);
 
   prefs.begin("theme", false);
   themeBgColor = prefs.getString("bg", "#0f0f14");
@@ -521,7 +541,8 @@ void setup() {
   imu.enableFeature(BMI2_STEP_ACTIVITY);
 
   improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32_S3, "StepStick",
-                             FIRMWARE_VERSION, "StepStick", "http://{LOCAL_IPV4}");
+                             FIRMWARE_VERSION, "StepStick",
+                             "http://{LOCAL_IPV4}");
   improvSerial.setCustomConnectWiFi(connectToWifi);
 
   M5.Display.drawString("Connecting...", M5.Display.width() / 2,
@@ -552,7 +573,7 @@ void setup() {
       delay(10);
     }
   }
-  WiFi.setSleep(false);
+  WiFi.setSleep(true);
   batteryLevel = M5.Power.getBatteryLevel();
 
   M5.Display.fillScreen(TFT_BLACK);
@@ -602,6 +623,7 @@ void loop() {
   if (isScreenOn && (millis() - lastInteractionTime > SCREEN_TIMEOUT)) {
     M5.Display.setBrightness(0);
     M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.sleep();
     isScreenOn = false;
   }
 
@@ -624,12 +646,10 @@ void loop() {
 
   activityString = getIconStr(currentActivity);
 
-  if (displaySteps != lastBroadcastSteps || currentActivity != lastActivity) {
-    String json = "{\"steps\":" + String(displaySteps) +
-                  ",\"state\":" + String(currentActivity) + ",\"activity\":\"" +
-                  activityString + "\"" +
-                  ",\"battery\":" + String(batteryLevel) + "}";
-    webSocket.broadcastTXT(json);
+  if (currentActivity != lastActivity ||
+      abs((int)(displaySteps - lastBroadcastSteps)) >= 10) {
+    String payload = buildStateJson();
+    webSocket.broadcastTXT(payload);
     lastBroadcastSteps = displaySteps;
     lastActivity = currentActivity;
   }
