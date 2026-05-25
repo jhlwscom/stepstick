@@ -35,44 +35,6 @@ For the complete setup guide, visit the [Setup Page](https://jhlwscom.github.io/
 
 ---
 
-## 💻 For Developers: Building from Source
-
-StepStick is built using the Arduino framework on top of PlatformIO. It is designed with a strict, reproducible build environment.
-
-### Prerequisites
-* [VS Code](https://code.visualstudio.com/) with the PlatformIO extension.
-* Python 3.13 (recommended).
-
-### Build Instructions
-1. **Clone the repository:**
-```bash
-   git clone [https://github.com/jhlwscom/stepstick.git](https://github.com/jhlwscom/stepstick.git)
-   cd stepstick
-
-```
-
-2. **Set up the hermetic build environment:**
-We enforce a specific version of the PlatformIO core to prevent toolchain drift.
-
-```bash
-   pip install -r requirements.txt
-
-```
-
-3. **Build and Upload:**
-
-```bash
-   pio run -e m5stack-sticks3 --target upload
-
-```
-
-### Architecture Overview
-
-StepStick is engineered for low latency and high battery efficiency on the 250mAh M5StickS3:
-
-* **Improv Wi-Fi:** Replaces heavy Captive Portal HTTP servers with Web Serial provisioning, saving heap memory and streamlining onboarding.
-* **Event-Driven WebSockets:** Instead of OBS polling the device via HTTP (which drains the battery), the ESP32 acts as a WebSocket server (Port 81). It only broadcasts payloads when a step is registered or an activity state transitions.
-* **Dynamic CSS Injection:** Theme preferences are stored in ESP32 NVS. The `/theme.css` endpoint generates a stylesheet dynamically. Saving a new theme pushes a `{"command": "reload"}` WebSocket payload to OBS, refreshing the overlay instantly.
 
 ### Automated Dependency Management
 
