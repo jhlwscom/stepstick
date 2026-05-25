@@ -514,13 +514,13 @@ const char *overlayHTML = R"rawliteral(
 <body>
     <div id="app" class="mode-%OVERLAY_MODE%">
         
-        <div class="simple-mode" id="simple-steps" style="font-family: '%SFONT%'; color: %SCOLOR%;">0</div>
+        <div class="simple-mode" id="simple-steps" style="font-family: '%SFONT%'; color: %SCOLOR%;">-</div>
 
         <div class="widget-wrapper">
             
             <div class="hud-container">
                 <div class="metric">
-                    <div class="step-value" id="steps">0</div>
+                    <div class="step-value" id="steps">-</div>
                     <div class="step-label">Steps</div>
                 </div>
                 <div class="divider" id="activity-divider"></div>
