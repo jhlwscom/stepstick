@@ -73,7 +73,7 @@
       <input type="password" id="wifi-pass" placeholder="••••••••" autocomplete="current-password">
     </div>
 
-    <button class="btn btn-primary" id="wifi-btn" onclick="provisionWifi()">📶 Connect Device via USB</button>
+    <button class="btn btn-primary" id="wifi-btn">📶 Connect Device via USB</button>
     <div id="wifi-log"></div>
   </div>
 
@@ -94,71 +94,28 @@
   MIT License
 </footer>
 
-<script>
+<script type="module">
+import { ImprovSerial } from 'https://esm.sh/improv-wifi-serial-sdk@2.5.0/dist/serial.js';
+
 if (!('serial' in navigator)) {
   document.getElementById('no-serial').style.display = 'block';
   document.getElementById('wifi-btn').disabled = true;
 }
-
-// ── Improv WiFi Serial Protocol ────────────────────────────────────────────
-// Spec: https://www.improv-wifi.com/serial/
-// Packet: "IMPROV"(6) | version(1) | type(1) | length(1) | data(N) | checksum(1)
-// Type 0x01 = Current State   (device → host)
-// Type 0x02 = Error State     (device → host)
-// Type 0x03 = RPC Command     (host → device)
-// RPC command 0x01 = Send WiFi settings: [ssid_len][ssid...][pass_len][pass...]
-
-const MAGIC = [0x49, 0x4D, 0x50, 0x52, 0x4F, 0x56]; // "IMPROV"
-
-function buildWifiPacket(ssid, pass) {
-  const enc = new TextEncoder();
-  const s = enc.encode(ssid);
-  const p = enc.encode(pass);
-  const cmdData = [s.length, ...s, p.length, ...p];
-  const rpcData = [0x01, cmdData.length, ...cmdData];
-  const bytes = [...MAGIC, 0x01, 0x03, rpcData.length, ...rpcData];
-  let sum = 0;
-  bytes.forEach(b => sum = (sum + b) & 0xFF);
-  return new Uint8Array([...bytes, sum]);
-}
-
-function scanBuffer(buf) {
-  let state = null, error = null;
-  for (let i = 0; i <= buf.length - 9; i++) {
-    if (!MAGIC.every((b, j) => buf[i + j] === b)) continue;
-    const type = buf[i + 7];
-    const len  = buf[i + 8];
-    if (buf.length < i + 9 + len + 1) break;
-    let sum = 0;
-    for (let j = i; j < i + 9 + len; j++) sum = (sum + buf[j]) & 0xFF;
-    if (sum !== buf[i + 9 + len]) { i++; continue; }
-    const data = buf.slice(i + 9, i + 9 + len);
-    if (type === 0x01 && data.length) state = data[0];
-    if (type === 0x02 && data.length) error = data[0];
-    i += 9 + len;
-  }
-  return { state, error };
-}
-
-const STATE_LABELS = {
-  0x02: 'Waiting for authorisation…',
-  0x03: 'WiFi credentials received…',
-  0x04: 'Connecting to WiFi…',
-  0x05: '✓ Connected!',
-};
-
-const ERROR_LABELS = {
-  0x01: 'Invalid RPC packet',
-  0x02: 'Unknown command',
-  0x03: 'Unable to connect — check password and network',
-  0x04: 'Not authorised',
-};
 
 function setLog(msg, cls = '') {
   const el = document.getElementById('wifi-log');
   el.textContent = msg;
   el.className = cls;
 }
+
+const STATE_LABELS = {
+  'awaiting-authorization': 'Waiting for authorisation…',
+  'authorized':             'Authorised — sending credentials…',
+  'provisioning':           'Connecting to WiFi…',
+  'provisioned':            '✓ Connected!',
+};
+
+document.getElementById('wifi-btn').addEventListener('click', provisionWifi);
 
 async function provisionWifi() {
   const ssid = document.getElementById('wifi-ssid').value.trim();
@@ -168,50 +125,34 @@ async function provisionWifi() {
   const btn = document.getElementById('wifi-btn');
   btn.disabled = true;
 
-  let port;
+  let improv, port;
   try {
     port = await navigator.serial.requestPort();
     await port.open({ baudRate: 115200 });
-    setLog('Sending credentials…');
 
-    const writer = port.writable.getWriter();
-    await writer.write(buildWifiPacket(ssid, pass));
-    writer.releaseLock();
+    improv = new ImprovSerial(port, console);
 
-    const reader = port.readable.getReader();
-    const buf = [];
-    let finished = false;
-    const timer = setTimeout(() => { finished = true; reader.cancel(); }, 20000);
+    improv.addEventListener('state-changed', () => {
+      const label = STATE_LABELS[improv.state] ?? ('State: ' + improv.state);
+      setLog(label, improv.state === 'provisioned' ? 'success' : '');
+    });
 
-    while (!finished) {
-      try {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) buf.push(...value);
-      } catch {
-        break;
+    improv.addEventListener('error-changed', () => {
+      if (improv.error && improv.error !== 'no-error') {
+        setLog('Error: ' + improv.error, 'error');
       }
+    });
 
-      const { state, error } = scanBuffer(buf);
-
-      if (error !== null) {
-        setLog('Error: ' + (ERROR_LABELS[error] ?? 'Unknown error (code ' + error + ')'), 'error');
-        finished = true;
-      } else if (state !== null) {
-        setLog(STATE_LABELS[state] ?? 'State ' + state);
-        if (state === 0x05) finished = true;
-      }
-    }
-
-    clearTimeout(timer);
-    reader.releaseLock();
-
-    if (buf.length === 0) setLog('No response from device. Is it connected and running StepStick firmware?', 'error');
+    setLog('Connecting to device…');
+    await new Promise(r => setTimeout(r, 1000));
+    await improv.initialize(10000);
+    await improv.provision(ssid, pass, 20000);
   } catch (e) {
     if (e.name !== 'NotFoundError')
       setLog('Error: ' + e.message, 'error');
   } finally {
-    if (port) try { await port.close(); } catch {}
+    if (improv) try { await improv.close(); } catch {}
+    else if (port) try { await port.close(); } catch {}
     btn.disabled = false;
   }
 }

@@ -1,0 +1,46 @@
+// Minimal Improv WiFi test sketch
+// To use: rename stepstick.ino -> stepstick.ino.bak
+//         rename this file    -> improv_test.ino
+// Then flash via: pio run -t upload
+
+#include <M5Unified.h>
+#include <ImprovWiFiLibrary.h>
+
+ImprovWiFi improv(&Serial);
+
+bool connectToWifi(const char *ssid, const char *pass) {
+  WiFi.begin(ssid, pass);
+  unsigned long t = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t < 15000) delay(100);
+  return WiFi.status() == WL_CONNECTED;
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  auto cfg = M5.config();
+  M5.begin(cfg);
+
+  M5.Display.setRotation(3);
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setFont(&fonts::FreeSans9pt7b);
+  M5.Display.drawString("Improv test", M5.Display.width() / 2, M5.Display.height() / 2 - 12);
+  M5.Display.drawString("Connect via USB", M5.Display.width() / 2, M5.Display.height() / 2 + 12);
+
+  improv.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32_S3,
+                       "ImprovTest", "0.0.1", "ImprovTest", "");
+  improv.setCustomConnectWiFi(connectToWifi);
+}
+
+void loop() {
+  improv.handleSerial();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.drawString("Connected!", M5.Display.width() / 2, M5.Display.height() / 2 - 12);
+    M5.Display.drawString(WiFi.localIP().toString(), M5.Display.width() / 2, M5.Display.height() / 2 + 12);
+    delay(100);
+  }
+}

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Monitor — StepStick</title>
+  <meta name="description" content="Live WebSocket monitor for StepStick battery and performance testing.">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    .debug-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+    }
+
+    .stat-card .label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .stat-card .unit {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .stat-card.accent .value { color: var(--accent); }
+    .stat-card.warn .value { color: #ffaa00; }
+    .stat-card.danger .value { color: var(--danger); }
+
+    .connect-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+
+    .connect-bar input {
+      flex: 1;
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: monospace;
+    }
+
+    .connect-bar input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-muted { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+      margin-right: 6px;
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .status-dot.error { background: var(--danger); }
+
+    .status-text {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .chart-card h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+    }
+
+    .chart-card canvas {
+      max-height: 180px;
+    }
+
+    .log-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 32px;
+    }
+
+    .log-card h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #message-log {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-entry .ts { color: #555577; margin-right: 8px; }
+    .log-entry .data { color: #aabbcc; }
+
+    .activity-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--surface-2);
+      color: var(--muted);
+    }
+
+    .activity-badge.walking { background: #00ffcc22; color: var(--accent); }
+    .activity-badge.running { background: #ff444422; color: var(--danger); }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+    <div class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./setup.html">Get Started</a>
+      <a href="./technical.html">Technical</a>
+      <a href="./debug.html" class="active">Debug</a>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:1000px;">
+
+    <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">Debug Monitor</h1>
+    <p style="color:var(--muted); margin-bottom:32px;">Live WebSocket stream monitor for battery-life and performance testing.</p>
+
+    <!-- Connection bar -->
+    <div class="connect-bar">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-text" class="status-text">Disconnected</span>
+      <input type="text" id="host-input" value="stepstick.local" placeholder="hostname or IP" />
+      <button class="btn btn-primary" id="connect-btn" onclick="connect()">Connect</button>
+      <button class="btn btn-danger" id="disconnect-btn" onclick="disconnect()" style="display:none;">Disconnect</button>
+      <button class="btn btn-muted" onclick="clearData()">Clear</button>
+    </div>
+
+    <!-- Stat cards -->
+    <p class="section-title">Live Stats</p>
+    <div class="debug-grid">
+      <div class="stat-card accent">
+        <div class="label">Steps</div>
+        <div class="value" id="stat-steps">—</div>
+      </div>
+      <div class="stat-card" id="card-activity">
+        <div class="label">Activity</div>
+        <div class="value" id="stat-activity">—</div>
+      </div>
+      <div class="stat-card" id="card-battery">
+        <div class="label">Battery</div>
+        <div class="value" id="stat-battery">—</div>
+        <div class="unit">%</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="label">Pace</div>
+        <div class="value" id="stat-pace">—</div>
+        <div class="unit">steps / min</div>
+      </div>
+      <div class="stat-card" id="card-batt-life">
+        <div class="label">Est. Battery Life</div>
+        <div class="value" id="stat-batt-life">—</div>
+        <div class="unit" id="stat-batt-life-unit"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Messages</div>
+        <div class="value" id="stat-msgs">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Uptime</div>
+        <div class="value" id="stat-uptime">—</div>
+        <div class="unit" id="stat-uptime-unit">min</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Msg Rate</div>
+        <div class="value" id="stat-rate">—</div>
+        <div class="unit">/ min</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <p class="section-title">Charts</p>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Steps Over Time</h3>
+        <canvas id="chart-steps"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Pace (steps/min)</h3>
+        <canvas id="chart-pace"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Battery %</h3>
+        <canvas id="chart-battery"></canvas>
+      </div>
+    </div>
+
+    <!-- Message log -->
+    <div class="log-card">
+      <h3>
+        <span>Message Log</span>
+        <button class="btn btn-muted" style="padding:4px 12px; font-size:0.8rem;" onclick="clearLog()">Clear log</button>
+      </h3>
+      <div id="message-log"><span style="color:var(--muted); font-size:0.8rem; font-family:monospace;">Waiting for messages…</span></div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── State ────────────────────────────────────────────────────────────────
+    let ws = null;
+    let msgCount = 0;
+    let connectTime = null;
+    let uptimeInterval = null;
+
+    // Ring-buffer history for charts (max 120 points ≈ 2 min at 1/sec)
+    const MAX_POINTS = 120;
+    const history = { labels: [], steps: [], pace: [], battery: [] };
+
+    // Pace calculation: sliding window over last 60s of step data
+    const paceWindow = []; // [{t: ms, steps: n}, ...]
+    const PACE_WINDOW_MS = 60000;
+
+    // Battery drain tracking for life estimate
+    const battHistory = []; // [{t: ms, pct: n}, ...]
+
+    // ── Charts ────────────────────────────────────────────────────────────────
+    const chartDefaults = {
+      responsive: true,
+      maintainAspectRatio: true,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#888899', maxTicksLimit: 6, font: { size: 10 } },
+          grid: { color: '#2a2a38' }
+        },
+        y: {
+          ticks: { color: '#888899', font: { size: 10 } },
+          grid: { color: '#2a2a38' }
+        }
+      }
+    };
+
+    function makeChart(id, color, yLabel) {
+      return new Chart(document.getElementById(id), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            borderColor: color,
+            backgroundColor: color + '18',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          ...chartDefaults,
+          scales: {
+            ...chartDefaults.scales,
+            y: { ...chartDefaults.scales.y, title: { display: false } }
+          }
+        }
+      });
+    }
+
+    const chartSteps   = makeChart('chart-steps',   '#00ffcc', 'steps');
+    const chartPace    = makeChart('chart-pace',    '#ffaa00', 'steps/min');
+    const chartBattery = makeChart('chart-battery', '#4488ff', '%');
+
+    // Add a low-battery threshold line to battery chart
+    chartBattery.options.plugins.annotation = {};
+
+    // ── WebSocket ─────────────────────────────────────────────────────────────
+    function connect() {
+      const host = document.getElementById('host-input').value.trim() || 'stepstick.local';
+      setStatus('connecting', `Connecting to ${host}…`);
+
+      try {
+        ws = new WebSocket(`ws://${host}:81`);
+      } catch (e) {
+        setStatus('error', `Invalid host: ${e.message}`);
+        return;
+      }
+
+      ws.onopen = () => {
+        connectTime = Date.now();
+        msgCount = 0;
+        setStatus('connected', `Connected to ${host}`);
+        document.getElementById('connect-btn').style.display = 'none';
+        document.getElementById('disconnect-btn').style.display = '';
+        startUptimeTick();
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.command) return; // skip reload commands
+          handleMessage(d);
+        } catch (_) {}
+      };
+
+      ws.onclose = () => {
+        setStatus('error', 'Disconnected');
+        document.getElementById('connect-btn').style.display = '';
+        document.getElementById('disconnect-btn').style.display = 'none';
+        stopUptimeTick();
+        ws = null;
+      };
+
+      ws.onerror = () => {
+        setStatus('error', `Connection failed — check host and that the device is on the same network`);
+      };
+    }
+
+    function disconnect() {
+      if (ws) { ws.close(); ws = null; }
+    }
+
+    // ── Message Handling ──────────────────────────────────────────────────────
+    function handleMessage(d) {
+      const now = Date.now();
+      msgCount++;
+
+      // --- Steps ---
+      const steps = d.steps ?? 0;
+      document.getElementById('stat-steps').textContent = steps.toLocaleString();
+
+      // --- Activity ---
+      const actMap = { 0: ['Still', ''], 1: ['Walking', 'walking'], 2: ['Running', 'running'] };
+      const [actLabel, actClass] = actMap[d.state] ?? ['Unknown', ''];
+      const actEl = document.getElementById('stat-activity');
+      actEl.textContent = (d.activity || '') + ' ' + actLabel;
+      const cardActivity = document.getElementById('card-activity');
+      cardActivity.className = 'stat-card ' + (d.state === 2 ? 'danger' : d.state === 1 ? 'accent' : '');
+
+      // --- Battery ---
+      const batt = d.battery ?? null;
+      if (batt !== null) {
+        document.getElementById('stat-battery').textContent = batt;
+        const cardBatt = document.getElementById('card-battery');
+        cardBatt.className = 'stat-card' + (batt <= 15 ? ' danger' : batt <= 30 ? ' warn' : '');
+        battHistory.push({ t: now, pct: batt });
+        updateBatteryLife();
+      }
+
+      // --- Pace ---
+      paceWindow.push({ t: now, steps });
+      // Trim old entries
+      while (paceWindow.length > 1 && now - paceWindow[0].t > PACE_WINDOW_MS) {
+        paceWindow.shift();
+      }
+      let pace = 0;
+      if (paceWindow.length >= 2) {
+        const dt = (now - paceWindow[0].t) / 60000; // minutes
+        const ds = steps - paceWindow[0].steps;
+        pace = dt > 0 ? Math.round(ds / dt) : 0;
+      }
+      document.getElementById('stat-pace').textContent = pace > 0 ? pace : '—';
+
+      // --- Message rate ---
+      if (connectTime) {
+        const elapsedMin = (now - connectTime) / 60000;
+        const rate = elapsedMin > 0 ? (msgCount / elapsedMin).toFixed(1) : '—';
+        document.getElementById('stat-msgs').textContent = msgCount.toLocaleString();
+        document.getElementById('stat-rate').textContent = rate;
+      }
+
+      // --- Append to chart history ---
+      const label = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      pushHistory(label, steps, pace, batt);
+
+      // --- Log entry ---
+      appendLog(d);
+    }
+
+    function updateBatteryLife() {
+      const el = document.getElementById('stat-batt-life');
+      const unitEl = document.getElementById('stat-batt-life-unit');
+      if (battHistory.length < 2) {
+        el.textContent = '—';
+        unitEl.textContent = 'need more data';
+        return;
+      }
+      // Use oldest and newest reading to get drain rate
+      const oldest = battHistory[0];
+      const newest = battHistory[battHistory.length - 1];
+      const dtHours = (newest.t - oldest.t) / 3600000;
+      const drain = oldest.pct - newest.pct; // % drained
+      if (dtHours < 0.01 || drain <= 0) {
+        el.textContent = '—';
+        unitEl.textContent = 'measuring…';
+        return;
+      }
+      const drainPerHour = drain / dtHours;
+      const hoursLeft = newest.pct / drainPerHour;
+      const card = document.getElementById('card-batt-life');
+      if (hoursLeft < 1) {
+        el.textContent = Math.round(hoursLeft * 60);
+        unitEl.textContent = 'minutes';
+        card.className = 'stat-card danger';
+      } else {
+        el.textContent = hoursLeft.toFixed(1);
+        unitEl.textContent = 'hours';
+        card.className = 'stat-card' + (hoursLeft < 2 ? ' warn' : '');
+      }
+    }
+
+    // ── Chart Helpers ─────────────────────────────────────────────────────────
+    function pushHistory(label, steps, pace, battery) {
+      history.labels.push(label);
+      history.steps.push(steps);
+      history.pace.push(pace > 0 ? pace : null);
+      history.battery.push(battery);
+
+      if (history.labels.length > MAX_POINTS) {
+        history.labels.shift();
+        history.steps.shift();
+        history.pace.shift();
+        history.battery.shift();
+      }
+
+      chartSteps.data.labels = history.labels;
+      chartSteps.data.datasets[0].data = history.steps;
+      chartSteps.update('none');
+
+      chartPace.data.labels = history.labels;
+      chartPace.data.datasets[0].data = history.pace;
+      chartPace.update('none');
+
+      chartBattery.data.labels = history.labels;
+      chartBattery.data.datasets[0].data = history.battery;
+      chartBattery.update('none');
+    }
+
+    // ── Log ───────────────────────────────────────────────────────────────────
+    const MAX_LOG = 80;
+    let logEntries = [];
+
+    function appendLog(d) {
+      const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const raw = JSON.stringify(d);
+      logEntries.push({ ts, raw });
+      if (logEntries.length > MAX_LOG) logEntries.shift();
+      renderLog();
+    }
+
+    function renderLog() {
+      const el = document.getElementById('message-log');
+      el.innerHTML = logEntries.map(e =>
+        `<div class="log-entry"><span class="ts">${e.ts}</span><span class="data">${escHtml(e.raw)}</span></div>`
+      ).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function clearLog() {
+      logEntries = [];
+      document.getElementById('message-log').innerHTML =
+        '<span style="color:var(--muted); font-size:0.8rem; font-family:monospace;">Log cleared.</span>';
+    }
+
+    // ── Uptime ticker ─────────────────────────────────────────────────────────
+    function startUptimeTick() {
+      stopUptimeTick();
+      uptimeInterval = setInterval(() => {
+        if (!connectTime) return;
+        const s = Math.floor((Date.now() - connectTime) / 1000);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        let val, unit;
+        if (h > 0)      { val = `${h}:${String(m).padStart(2,'0')}`; unit = 'hr'; }
+        else if (m > 0) { val = `${m}:${String(sec).padStart(2,'0')}`; unit = 'min'; }
+        else            { val = sec; unit = 'sec'; }
+        document.getElementById('stat-uptime').textContent = val;
+        document.getElementById('stat-uptime-unit').textContent = unit;
+      }, 1000);
+    }
+
+    function stopUptimeTick() {
+      if (uptimeInterval) { clearInterval(uptimeInterval); uptimeInterval = null; }
+    }
+
+    // ── Status ────────────────────────────────────────────────────────────────
+    function setStatus(state, text) {
+      const dot = document.getElementById('status-dot');
+      const txt = document.getElementById('status-text');
+      dot.className = 'status-dot ' + (state === 'connected' ? 'connected' : state === 'error' ? 'error' : '');
+      txt.textContent = text;
+    }
+
+    // ── Clear all data ────────────────────────────────────────────────────────
+    function clearData() {
+      history.labels.length = history.steps.length = history.pace.length = history.battery.length = 0;
+      paceWindow.length = 0;
+      battHistory.length = 0;
+      logEntries = [];
+      msgCount = 0;
+      connectTime = connectTime ? Date.now() : null;
+      [chartSteps, chartPace, chartBattery].forEach(c => {
+        c.data.labels = [];
+        c.data.datasets[0].data = [];
+        c.update('none');
+      });
+      ['stat-steps','stat-activity','stat-battery','stat-pace',
+       'stat-batt-life','stat-msgs','stat-uptime','stat-rate'].forEach(id => {
+        document.getElementById(id).textContent = '—';
+      });
+      document.getElementById('stat-msgs').textContent = '0';
+      clearLog();
+    }
+
+    // Allow pressing Enter in the host input to connect
+    document.getElementById('host-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') connect();
+    });
+  </script>
+
+</body>
+</html>

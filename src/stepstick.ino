@@ -1,3 +1,4 @@
+#include "esp_pm.h"
 #include "version.h"
 #include <ESPmDNS.h>
 #include <ImprovWiFiLibrary.h>
@@ -7,6 +8,7 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <Wire.h>
+#include <esp_wifi.h>
 
 BMI270 imu;
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -32,9 +34,12 @@ int batteryLevel = 0;
 unsigned long lastInteractionTime = 0;
 const unsigned long SCREEN_TIMEOUT = 15000;
 bool isScreenOn = true;
+bool wifiResetWarning = false;
+bool displayDirty = true;
 
 // --- Overlay Modes ---
 int overlayMode = 1; // 0 = Simple, 1 = Standard, 2 = Advanced
+int powerMode = 1;   // 0 = Performance, 1 = Balanced, 2 = Battery Saver
 String simpleFont;
 String simpleColor;
 
@@ -50,6 +55,7 @@ String iconRun;
 
 bool themeGlow = true;
 bool themeGreyscale = true;
+bool themeShowEmoji = true;
 
 // --- Helper: Secure JSON Generation ---
 String buildStateJson() {
@@ -215,6 +221,7 @@ const char *configHTML = R"rawliteral(
     </style>
 </head>
 <body>
+    %MDNS_WARNING%
     <div class='card'>
         <h2>OBS Integration</h2>
         <div class="help-text">Add this URL as a Browser Source (Clear custom CSS)</div>
@@ -239,6 +246,16 @@ const char *configHTML = R"rawliteral(
                     <option value="0" %MODE0%>Simple (Counter Only)</option>
                     <option value="1" %MODE1%>Standard (HUD)</option>
                     <option value="2" %MODE2%>Advanced (HUD + Stats)</option>
+                </select>
+            </div>
+
+            <div class="form-group col" style="margin-bottom: 24px;">
+                <label>Power &amp; Responsivity Mode</label>
+                <div class="help-text">Controls background update speed when screen is off</div>
+                <select name="powerMode">
+                    <option value="0" %PWR0%>Performance (Fastest UI, High Drain)</option>
+                    <option value="1" %PWR1%>Balanced (1-sec updates, Default)</option>
+                    <option value="2" %PWR2%>Battery Saver (Slow updates, Max Life)</option>
                 </select>
             </div>
 
@@ -310,6 +327,16 @@ const char *configHTML = R"rawliteral(
                     </div>
                     <label class="switch">
                         <input type="checkbox" name="glow" %GLOW%>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <div class="col">
+                        <label>Show Activity Emoji</label>
+                        <div class="help-text">Displays the status icon in Standard/Advanced modes</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="emoji" %EMOJI%>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -496,8 +523,8 @@ const char *overlayHTML = R"rawliteral(
                     <div class="step-value" id="steps">0</div>
                     <div class="step-label">Steps</div>
                 </div>
-                <div class="divider"></div>
-                <div class="metric">
+                <div class="divider" id="activity-divider"></div>
+                <div class="metric" id="activity-metric">
                     <div class="status-icon" id="activity">🧍</div>
                 </div>
                 <div class="battery-warning" id="battery-status">
@@ -650,6 +677,20 @@ void handleRoot() {
   html.replace("%IRUN%", iconRun);
   html.replace("%GREY%", themeGreyscale ? "checked" : "");
   html.replace("%GLOW%", themeGlow ? "checked" : "");
+  html.replace("%EMOJI%", themeShowEmoji ? "checked" : "");
+  html.replace("%PWR0%", powerMode == 0 ? "selected" : "");
+  html.replace("%PWR1%", powerMode == 1 ? "selected" : "");
+  html.replace("%PWR2%", powerMode == 2 ? "selected" : "");
+
+  String mdnsWarning = "";
+  if (server.hostHeader().endsWith(".local")) {
+    String ipUrl = "http://" + WiFi.localIP().toString() + "/";
+    mdnsWarning = "<div style='background:#7c5a00;color:#ffe;padding:10px 16px;"
+                  "font-size:13px;text-align:center'>"
+                  "Tip: <a href='" + ipUrl + "' style='color:#ffd'>" + ipUrl + "</a>"
+                  " loads faster than stepstick.local</div>";
+  }
+  html.replace("%MDNS_WARNING%", mdnsWarning);
 
   server.send(200, "text/html", html);
 }
@@ -669,6 +710,10 @@ void handleOverlay() {
   dynamicCSS += "--walk-color: " + themeWalkColor + ";\n";
   dynamicCSS += "--run-color: " + themeRunColor + ";\n";
   dynamicCSS += "}\n";
+
+  if (!themeShowEmoji)
+    dynamicCSS +=
+        "#activity-metric, #activity-divider { display: none !important; }\n";
 
   dynamicCSS += ".status-icon { ";
   if (themeGreyscale)
@@ -818,6 +863,14 @@ void handleSaveTheme() {
   themeGreyscale = server.hasArg("grey");
   prefs.putBool("grey", themeGreyscale);
 
+  themeShowEmoji = server.hasArg("emoji");
+  prefs.putBool("emoji", themeShowEmoji);
+
+  if (server.hasArg("powerMode")) {
+    powerMode = server.arg("powerMode").toInt();
+    prefs.putInt("power", powerMode);
+  }
+
   // Broadcast reload command to OBS before redirecting the config page
   webSocket.broadcastTXT("{\"command\":\"reload\"}");
 
@@ -838,6 +891,7 @@ void wakeScreen() {
     M5.Display.wakeup();
     M5.Display.setBrightness(255);
     isScreenOn = true;
+    displayDirty = true;
   }
   lastInteractionTime = millis();
 }
@@ -880,6 +934,8 @@ void loadPreferences() {
 
   themeGlow = prefs.getBool("glow", true);
   themeGreyscale = prefs.getBool("grey", true);
+  themeShowEmoji = prefs.getBool("emoji", true);
+  powerMode = prefs.getInt("power", 1);
 }
 
 void handleResetConfig() {
@@ -893,9 +949,18 @@ void handleResetConfig() {
 }
 
 void setup() {
+  Serial.begin(115200);
+
   auto cfg = M5.config();
   M5.begin(cfg);
+  M5.Power.setExtOutput(false);
+  M5.Power.setLed(0);
+  M5.Speaker.end();
+  M5.Mic.end();
   setCpuFrequencyMhz(80);
+  esp_pm_config_esp32s3_t pm_config = {
+      .max_freq_mhz = 80, .min_freq_mhz = 10, .light_sleep_enable = true};
+  esp_pm_configure(&pm_config);
 
   prefs.begin("theme", false);
 
@@ -907,6 +972,7 @@ void setup() {
   M5.Display.setTextDatum(middle_center);
   M5.Display.setFont(&fonts::FreeSans9pt7b);
 
+#ifndef DUMMY_IMU
   Wire1.begin(M5.In_I2C.getSDA(), M5.In_I2C.getSCL(), 400000);
   if (imu.beginI2C(BMI2_I2C_PRIM_ADDR, Wire1) != BMI2_OK) {
     M5.Display.fillScreen(TFT_RED);
@@ -919,6 +985,7 @@ void setup() {
 
   imu.enableFeature(BMI2_STEP_COUNTER);
   imu.enableFeature(BMI2_STEP_ACTIVITY);
+#endif
 
   improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32_S3, "StepStick",
                              FIRMWARE_VERSION, "StepStick",
@@ -954,6 +1021,7 @@ void setup() {
     }
   }
   WiFi.setSleep(true);
+  esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
   batteryLevel = M5.Power.getBatteryLevel();
 
   M5.Display.fillScreen(TFT_BLACK);
@@ -986,19 +1054,33 @@ void loop() {
     stepOffset = hwStepCount;
     displaySteps = 0;
     lastBroadcastSteps = 0;
+    wifiResetWarning = false;
     wakeScreen();
   } else if (M5.BtnA.wasPressed()) {
+    wifiResetWarning = false;
     wakeScreen();
   }
 
-  if (M5.BtnB.wasPressed()) {
+  if (M5.BtnB.wasHold()) {
+    if (wifiResetWarning) {
+      wakeScreen();
+      M5.Display.fillScreen(TFT_BLACK);
+      M5.Display.drawString("Clearing WiFi...", M5.Display.width() / 2,
+                            M5.Display.height() / 2);
+      WiFi.disconnect(true, true);
+      delay(500);
+      ESP.restart();
+    }
+  } else if (M5.BtnB.wasPressed()) {
     wakeScreen();
+    wifiResetWarning = true;
     M5.Display.fillScreen(TFT_BLACK);
-    M5.Display.drawString("Clearing WiFi...", M5.Display.width() / 2,
-                          M5.Display.height() / 2);
-    WiFi.disconnect(true, true);
-    delay(500);
-    ESP.restart();
+    M5.Display.setTextColor(TFT_YELLOW, TFT_BLACK);
+    M5.Display.drawString("Hold B to reset", M5.Display.width() / 2,
+                          M5.Display.height() / 2 - 10);
+    M5.Display.drawString("WiFi credentials", M5.Display.width() / 2,
+                          M5.Display.height() / 2 + 10);
+    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   }
 
   if (isScreenOn && (millis() - lastInteractionTime > SCREEN_TIMEOUT)) {
@@ -1008,13 +1090,53 @@ void loop() {
     isScreenOn = false;
   }
 
-  imu.getStepCount(&hwStepCount);
-  uint8_t currentSensorActivity;
-  imu.getStepActivity(&currentSensorActivity);
-  currentActivity = (Activity)currentSensorActivity;
+  unsigned long imuPollRate;
+  int activeSleep, backgroundSleep;
+  if (powerMode == 0) {
+    imuPollRate = 100;
+    activeSleep = 10;
+    backgroundSleep = 50;
+  } else if (powerMode == 1) {
+    imuPollRate = 1000;
+    activeSleep = 20;
+    backgroundSleep = 250;
+  } else {
+    imuPollRate = 2000;
+    activeSleep = 50;
+    backgroundSleep = 1000;
+  }
 
-  if (currentActivity >= 1)
-    lastInteractionTime = millis();
+  static unsigned long lastImuPoll = 0;
+  if (millis() - lastImuPoll >= imuPollRate) {
+    lastImuPoll = millis();
+#ifdef DUMMY_IMU
+    // Simulate a brisk walk at ~120 steps/min (2 steps/sec) for battery testing
+    {
+      static unsigned long dummyLastMs = 0;
+      static float dummyAccum = 0.0f;
+      static bool dummyReady = false;
+      unsigned long nowMs = millis();
+      if (!dummyReady) {
+        dummyLastMs = nowMs;
+        dummyReady = true;
+      } else {
+        dummyAccum += (nowMs - dummyLastMs) / 1000.0f * 2.0f;
+        dummyLastMs = nowMs;
+        if (dummyAccum >= 1.0f) {
+          uint32_t newSteps = (uint32_t)dummyAccum;
+          hwStepCount += newSteps;
+          dummyAccum -= (float)newSteps;
+        }
+      }
+    }
+    currentActivity = WALKING;
+#else
+    imu.getStepCount(&hwStepCount);
+    uint8_t currentSensorActivity;
+    imu.getStepActivity(&currentSensorActivity);
+    currentActivity = (Activity)currentSensorActivity;
+#endif
+  }
 
   static unsigned long lastBatteryPoll = 0;
   if (millis() - lastBatteryPoll >= 30000) {
@@ -1043,41 +1165,56 @@ void loop() {
     }
   }
 
-  static unsigned long lastDisplayUpdate = 0;
-  if (isScreenOn && millis() - lastDisplayUpdate > 100) {
-    // --- 1. Draw Steps (Center) ---
-    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-    M5.Display.setTextDatum(middle_center);
-    M5.Display.setFont(&fonts::FreeSansBold24pt7b);
-    M5.Display.drawString(String(displaySteps) + "   ", M5.Display.width() / 2,
-                          M5.Display.height() / 2 - 5);
+  if (wifiResetWarning)
+    return; // hold display until dismissed or confirmed
+  if (isScreenOn) {
+    static uint32_t lastDrawnSteps = UINT32_MAX;
+    static int lastDrawnBattery = -1;
 
-    // --- 2. Draw IP Address (Bottom) ---
-    M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
-    M5.Display.setTextDatum(bottom_center);
-    M5.Display.setFont(&fonts::FreeSans9pt7b);
-    M5.Display.drawString("http://" + WiFi.localIP().toString() + "  ",
-                          M5.Display.width() / 2, M5.Display.height() - 5);
+    if (displayDirty || displaySteps != lastDrawnSteps || batteryLevel != lastDrawnBattery) {
+      displayDirty = false;
+      lastDrawnSteps = displaySteps;
+      lastDrawnBattery = batteryLevel;
 
-    // --- 3. Draw Battery (Top Right) ---
-    if (batteryLevel <= 20) {
-      M5.Display.setTextColor(TFT_RED, TFT_BLACK);
-    } else {
-      M5.Display.setTextColor(TFT_GREEN, TFT_BLACK);
+      M5.Display.fillScreen(TFT_BLACK);
+
+      // --- 1. Draw Steps (Center) ---
+      M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+      M5.Display.setTextDatum(middle_center);
+      M5.Display.setFont(&fonts::FreeSansBold24pt7b);
+      M5.Display.drawString(String(displaySteps), M5.Display.width() / 2,
+                            M5.Display.height() / 2 - 5);
+
+      // --- 2. Draw IP Address (Bottom) ---
+      M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
+      M5.Display.setTextDatum(bottom_center);
+      M5.Display.setFont(&fonts::FreeSans9pt7b);
+      M5.Display.drawString("http://" + WiFi.localIP().toString(),
+                            M5.Display.width() / 2, M5.Display.height() - 5);
+
+      // --- 3. Draw Battery (Top Right) ---
+      if (batteryLevel <= 20) {
+        M5.Display.setTextColor(TFT_RED, TFT_BLACK);
+      } else {
+        M5.Display.setTextColor(TFT_GREEN, TFT_BLACK);
+      }
+      M5.Display.setTextDatum(top_right);
+      M5.Display.setFont(&fonts::FreeSans9pt7b);
+      M5.Display.drawString(String(batteryLevel) + "%", M5.Display.width() - 5,
+                            5);
+
+      // --- 4. Draw CalVer Firmware Version (Top Left) ---
+      // Using a muted grey so it stays out of the way of the main metrics
+      M5.Display.setTextColor(TFT_DARKGRAY, TFT_BLACK);
+      M5.Display.setTextDatum(top_left);
+      M5.Display.setFont(&fonts::FreeSans9pt7b);
+      M5.Display.drawString(String("v") + FIRMWARE_VERSION, 5, 5);
     }
-    M5.Display.setTextDatum(top_right);
-    M5.Display.setFont(&fonts::FreeSans9pt7b);
-    M5.Display.drawString(String(batteryLevel) + "% ", M5.Display.width() - 5,
-                          5);
+  }
 
-    // --- 4. Draw CalVer Firmware Version (Top Left) ---
-    // Using a muted grey so it stays out of the way of the main metrics
-    M5.Display.setTextColor(TFT_DARKGRAY, TFT_BLACK);
-    M5.Display.setTextDatum(top_left);
-    M5.Display.setFont(&fonts::FreeSans9pt7b);
-    M5.Display.drawString(String("v") + FIRMWARE_VERSION, 5,
-                          5); // 5px padding from edge
-
-    lastDisplayUpdate = millis();
+  if (isScreenOn) {
+    vTaskDelay(pdMS_TO_TICKS(activeSleep));
+  } else {
+    vTaskDelay(pdMS_TO_TICKS(backgroundSleep));
   }
 }
