@@ -420,7 +420,7 @@ const char *configHTML = R"rawliteral(
         document.getElementById('btn-reset-config').addEventListener('click', function() {
             if(confirm("Are you sure you want to revert all overlay settings to default?")) {
                 fetch('/resetconfig', { method: 'POST' }).then(response => {
-                    if(response.ok) window.location.reload(); 
+                    if(response.ok) window.location.href = '/';
                 });
             }
         });
@@ -489,11 +489,10 @@ const char *overlayHTML = R"rawliteral(
         .step-value { font-size: 2.625rem; font-weight: 800; letter-spacing: -0.0625rem; line-height: 1; }
         .step-label { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.0625rem; opacity: 0.6; }
         .divider { width: 0.125rem; height: 2.5rem; background: var(--text-color); opacity: 0.1; border-radius: 0.125rem; }
-        .status-icon { display: flex; align-items: center; justify-content: center; font-size: 2.75rem; line-height: 1; opacity: 0.3; transition: all 0.3s ease; }
-        .emote { height: 3.5rem; width: auto; max-width: 3.5rem; object-fit: contain; }
+        .status-icon { display: flex; align-items: center; justify-content: center; width: 3.75rem; height: 3.75rem; font-size: 3rem; line-height: 1; opacity: 0.3; transition: all 0.3s ease; transform: translateZ(0); will-change: filter; flex-shrink: 0; }
+        .emote { width: 100%; height: 100%; object-fit: contain; transform: translateZ(0); display: block; }
         .status-icon.active-walk { opacity: 1; }
         .status-icon.active-run { opacity: 1; }
-        .emote { height: 3rem; width: auto; max-width: 3rem; object-fit: contain; }
         .battery-warning { display: none; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 800; color: #ff4444; background: rgba(255, 68, 68, 0.15); padding: 0.375rem 0.75rem; border-radius: 0.5rem; animation: pulse 2s infinite; }
         .battery-warning.show-warning { display: flex; }
         
@@ -692,6 +691,7 @@ void handleRoot() {
   }
   html.replace("%MDNS_WARNING%", mdnsWarning);
 
+  server.sendHeader("Cache-Control", "no-store");
   server.send(200, "text/html", html);
 }
 
@@ -740,7 +740,7 @@ void handleOverlay() {
 }
 
 void handleThemeCSS() {
-  char css[768];
+  char css[896];
   int len = 0;
 
   len += snprintf(css + len, sizeof(css) - len,
@@ -749,9 +749,9 @@ void handleThemeCSS() {
 
   len += snprintf(css + len, sizeof(css) - len,
                   ".status-icon { display: flex; align-items: center; "
-                  "justify-content: center; "
-                  "font-size: 32px; line-height: 1; opacity: 0.3; transition: "
-                  "all 0.3s ease; "
+                  "justify-content: center; width: 60px; height: 60px; "
+                  "font-size: 48px; line-height: 1; opacity: 0.3; transition: "
+                  "all 0.3s ease; flex-shrink: 0; transform: translateZ(0); will-change: filter; "
                   "%s}\n",
                   themeGreyscale ? "filter: grayscale(100%);" : "");
 
@@ -778,8 +778,8 @@ void handleThemeCSS() {
   }
 
   snprintf(css + len, sizeof(css) - len,
-           ".emote { height: 48px; width: auto; max-width: 48px; object-fit: "
-           "contain; }\n");
+           ".emote { width: 100%%; height: 100%%; object-fit: contain; "
+           "transform: translateZ(0); display: block; }\n");
 
   server.send(200, "text/css", css);
 }

@@ -63,6 +63,41 @@
       </p>
     </div>
 
+    <h2 class="section-title">Privacy & Battery Optimizations</h2>
+    <p style="color:var(--muted); font-size:0.95rem; margin-bottom:20px; line-height:1.6;">
+      StepStick is built entirely on off-the-shelf hardware, making it easily accessible to non-technical users without
+      requiring complex soldering or custom PCB fabrication. It operates as a 100% local device. Fitness data never
+      leaves your local network, ensuring personal metrics are not exposed to untrusted cloud services or third parties.
+      To support this standalone functionality, the firmware includes aggressive battery optimizations to maximize
+      uptime.
+    </p>
+
+    <div style="margin-bottom: 40px;">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">1. Dynamic Light Sleep & CPU Yielding</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        The ESP32-S3 utilizes the <code>esp_pm</code> power management unit. When the screen times out, the firmware
+        dynamically yields to the FreeRTOS idle task using <code>vTaskDelay</code>. This allows the CPU frequency to
+        drop from 80MHz to 10MHz and dramatically reduces the wake-cycle frequency, cutting baseline power consumption
+        while maintaining background execution.
+      </p>
+
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">2. Throttled I²C Polling & Max Modem Sleep</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        The BMI270 holds step counts in hardware, eliminating the need for continuous CPU polling. I²C traffic is
+        throttled to a minimum of 1Hz. Additionally, the Wi-Fi radio is forced into <code>WIFI_PS_MAX_MODEM</code>
+        state. By batching WebSocket broadcasts based on the active Power Mode, the RF receiver powers down entirely for
+        seconds at a time.
+      </p>
+
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">3. Parasitic Drain Elimination</h3>
+      <p style="color:var(--muted); font-size:0.95rem; margin-bottom:16px; line-height:1.6;">
+        Standard M5Unified initialization powers up components that StepStick does not require. The firmware explicitly
+        disables the 5V boost converter connected to the Grove port (<code>M5.Power.setExtOutput(false)</code>) and
+        shuts down the internal audio amplifier and microphone (<code>M5.Speaker.end()</code>,
+        <code>M5.Mic.end()</code>) to recover power lost to idle peripherals.
+      </p>
+    </div>
+
     <h2 class="section-title">Hardware</h2>
 
     <div class="table-wrap">

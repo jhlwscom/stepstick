@@ -8,6 +8,8 @@ StepStick turns a $20 M5StickS3 development board into a real-time step counter 
 
 <img src="docs/images/m5sticks3-main.webp" alt="M5StickS3 device" height="200"> <img src="docs/images/m5sticks3-detailed.webp" alt="M5StickS3 button layout" height="200">
 
+<img src="docs/images/Screenshot_20260525_191421.png" alt="StepStick overlay live in OBS" width="600">
+
 ---
 
 ## ✨ Features
