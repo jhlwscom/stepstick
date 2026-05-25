@@ -76,3 +76,11 @@ This repository uses **Renovate** to strictly manage C++/Arduino library version
 
 ---
 
+## AI Policy
+
+A lot of this code is AI-generated. This was partly a learning project, for a software engineer to learn how to use AI tools to keep up with the quickly changing development landscape. All generated code was reviewed and understood before being committed.
+
+**On art and icons:** No AI-generated art is included in this project. The overlay themes ship without bundled icons. If you are customising with your own icons, please hire a human artist.
+
+---
+
