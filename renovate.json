@@ -3,11 +3,23 @@
   "extends": [
     "config:recommended"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update PlatformIO dependencies",
+      "fileMatch": [
+        "(^|/)platformio\\.ini$"
+      ],
+      "matchStrings": [
+        "[#;]\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>[^\\s]+)\\n\\s*(?:[^@\\n]+?)\\s*@\\s*(?<currentValue>[^\\s]+)"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "matchDatasources": [
-        "platformio",
-        "github-tags"
+        "github-tags",
+        "github-releases"
       ],
       "pinDigests": true,
       "minimumReleaseAge": "14 days",
