@@ -34,7 +34,9 @@ int batteryLevel = 0;
 
 // --- Power Management ---
 unsigned long lastInteractionTime = 0;
+unsigned long lastMotionTime = 0;
 const unsigned long SCREEN_TIMEOUT = 15000;
+const unsigned long MOTION_TIMEOUT = 300000; // 5 minutes
 bool isScreenOn = true;
 enum class ResetState : uint8_t { IDLE, WARNING, ARMED, HOLDING };
 ResetState resetState = ResetState::IDLE;
@@ -331,6 +333,7 @@ void setup() {
   server.begin();
 
   lastInteractionTime = millis();
+  lastMotionTime = millis();
 }
 
 void loop() {
@@ -420,6 +423,11 @@ void loop() {
     isScreenOn = false;
   }
 
+  if (millis() - lastMotionTime > MOTION_TIMEOUT) {
+    prefs.end();
+    M5.Power.powerOff();
+  }
+
   unsigned long imuPollRate;
   int activeSleep, backgroundSleep;
   if (powerMode == 0) {
@@ -466,6 +474,8 @@ void loop() {
     imu.getStepActivity(&currentSensorActivity);
     currentActivity = (Activity)currentSensorActivity;
 #endif
+    if (currentActivity != STILL)
+      lastMotionTime = millis();
   }
 
   static unsigned long lastBatteryPoll = 0;
