@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Get Started — StepStick</title>
   <meta name="description" content="Flash firmware, connect to WiFi, and add StepStick to OBS — all from your browser.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
@@ -16,13 +18,19 @@
       padding: 28px;
       margin-bottom: 24px;
     }
+
     .widget-title {
       display: flex;
       align-items: center;
       gap: 12px;
       margin-bottom: 10px;
     }
-    .widget-title h2 { font-size: 1.15rem; font-weight: 700; }
+
+    .widget-title h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
     .step-num {
       width: 28px;
       height: 28px;
@@ -36,9 +44,19 @@
       font-size: 0.82rem;
       flex-shrink: 0;
     }
-    .widget > p { color: var(--muted); font-size: 0.93rem; margin-bottom: 18px; }
 
-    .obs-steps { list-style: none; padding: 0; margin: 0; }
+    .widget>p {
+      color: var(--muted);
+      font-size: 0.93rem;
+      margin-bottom: 18px;
+    }
+
+    .obs-steps {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
     .obs-steps li {
       display: flex;
       gap: 14px;
@@ -47,12 +65,34 @@
       font-size: 0.93rem;
       color: var(--muted);
     }
-    .obs-steps li:last-child { border-bottom: none; }
-    .obs-steps li strong { color: var(--text); }
-    .check { color: var(--accent); font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
 
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .obs-steps li:last-child {
+      border-bottom: none;
+    }
+
+    .obs-steps li strong {
+      color: var(--text);
+    }
+
+    .check {
+      color: var(--accent);
+      font-size: 1rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
     .field input {
       width: 100%;
       padding: 10px 12px;
@@ -64,24 +104,65 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    .field input:focus { border-color: var(--accent); }
+
+    .field input:focus {
+      border-color: var(--accent);
+    }
+
     #wifi-log {
       margin-top: 14px;
       font-size: 0.88rem;
       min-height: 24px;
       color: var(--muted);
     }
-    #wifi-log.error { color: #ff8888; }
-    #wifi-log.success { color: var(--accent); }
+
+    #wifi-log.error {
+      color: #ff8888;
+    }
+
+    #wifi-log.success {
+      color: var(--accent);
+    }
+
+    #wifi-log.pending {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    #wifi-log.pending::before {
+      content: '';
+      width: 13px;
+      height: 13px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     @keyframes popIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to   { opacity: 1; transform: scale(1); }
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
 
     #no-serial {
       display: none;
-      background: rgba(255,68,68,0.07);
-      border: 1px solid rgba(255,68,68,0.22);
+      background: rgba(255, 68, 68, 0.07);
+      border: 1px solid rgba(255, 68, 68, 0.22);
       border-radius: 10px;
       padding: 14px 18px;
       color: #ffbbbb;
@@ -90,252 +171,318 @@
     }
   </style>
 </head>
+
 <body>
 
-<nav>
-  <a class="nav-brand" href="./index.html">🦶 StepStick</a>
-  <div class="nav-links">
-    <a href="./index.html">Home</a>
-    <a href="./setup.html" class="active">Get Started</a>
-    <a href="./technical.html">Technical</a>
+  <nav>
+    <a class="nav-brand" href="./index.html">🦶 StepStick</a>
+    <div class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./setup.html" class="active">Get Started</a>
+      <a href="./technical.html">Technical</a>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">Get Started</h1>
+    <p style="color:var(--muted); margin-bottom:20px;">Flash your M5StickS3, connect it to WiFi, and add the overlay to
+      OBS — all from this page.</p>
+
+    <div
+      style="display:flex; align-items:center; gap:16px; background:#1a1000; border:2px solid #ffb400; border-radius:12px; padding:16px 20px; margin-bottom:24px;">
+      <span style="font-size:2rem; flex-shrink:0;">⚠️</span>
+      <div>
+        <strong style="color:#ffb400; font-size:1rem;">This page only works in Chrome or Edge on a desktop PC.</strong>
+        <p style="color:#c8a060; font-size:0.88rem; margin-top:4px;">Safari, Firefox, and mobile browsers do not support
+          the Web Serial API required to flash and configure the device. If you're on the wrong browser, open this page
+          in Chrome or Edge and try again.</p>
+      </div>
+    </div>
+
+    <div id="no-serial">
+      <strong>Unsupported browser detected.</strong> Switch to Chrome or Edge on a desktop PC to use this page.
+    </div>
+
+    <!-- ── Step 1: Flash ── -->
+    <div class="widget">
+      <div class="widget-title">
+        <div class="step-num">1</div>
+        <h2>Flash the firmware</h2>
+      </div>
+      <p>Plug your M5StickS3 into your PC with a USB-C cable, then click the button below. A port picker will appear —
+        select the device and follow the prompts.</p>
+
+      <esp-web-install-button manifest="./manifest.json">
+        <button slot="activate" class="btn btn-primary" id="flash-btn">⚡ Connect &amp; Flash</button>
+      </esp-web-install-button>
+
+      <div class="callout tip" style="margin-top:16px;">
+        <span class="callout-icon">💡</span>
+        <span>No port appearing? Try a different cable — many USB-C cables are charge-only and won't work here.</span>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Power on ── -->
+    <div class="widget">
+      <div class="widget-title">
+        <div class="step-num">2</div>
+        <h2>Turn the device on</h2>
+      </div>
+      <p>After flashing the screen will go dark. Press the <strong>small grey button on the side of the device with the
+          STICK S3 sticker</strong> once to turn it back on. Keep the USB cable plugged in — you'll need it for the next
+        step.</p>
+      <p style="margin-top:8px;">The screen will show <strong>"Connect via USB to setup WiFi"</strong>. That means it's
+        ready.</p>
+      <div style="margin-top:16px;">
+        <img src="./images/m5sticks3-detailed.webp" alt="M5StickS3 — blue power button on the front face"
+          style="height:160px; border-radius:8px;">
+      </div>
+    </div>
+
+    <!-- ── Step 3: WiFi ── -->
+    <div class="widget">
+      <div class="widget-title">
+        <div class="step-num">3</div>
+        <h2>Connect to WiFi</h2>
+      </div>
+      <p>Type in your home network name and password, then click Connect. The device must still be plugged in via USB.
+      </p>
+
+      <div class="field">
+        <label for="wifi-ssid">Network name (SSID)</label>
+        <input type="text" id="wifi-ssid" placeholder="My WiFi" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="wifi-pass">Password</label>
+        <input type="password" id="wifi-pass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn btn-primary" id="wifi-btn">📶 Connect Device</button>
+      <div id="wifi-log"></div>
+
+      <div id="wifi-success"
+        style="display:none; margin-top:20px; background:#001a14; border:2px solid var(--accent); border-radius:12px; padding:20px 24px; text-align:center; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+        <div style="font-size:2.5rem; margin-bottom:8px;">🎉</div>
+        <div style="font-size:1.1rem; font-weight:800; color:var(--accent); margin-bottom:6px;">Connected to WiFi!</div>
+        <div style="font-size:0.9rem; color:#80ffe8;">The IP address is now showing on the device screen.<br>You can
+          unplug the USB cable and scroll down to Step 4.</div>
+      </div>
+
+      <div class="callout warn" style="margin-top:16px;">
+        <span class="callout-icon">⚠️</span>
+        <span>The M5StickS3 only supports <strong>2.4 GHz</strong> WiFi. If you have separate 2.4 GHz and 5 GHz
+          networks, make sure you pick the 2.4 GHz one.</span>
+      </div>
+    </div>
+
+    <!-- ── Step 4: OBS ── -->
+    <div class="widget">
+      <div class="widget-title">
+        <div class="step-num">4</div>
+        <h2>Add to OBS</h2>
+      </div>
+      <p>Once connected, the device's IP address appears on its screen. Use it to add the overlay to your stream.</p>
+
+      <ol class="obs-steps">
+        <li>
+          <span class="check">›</span>
+          <span>On your PC, open <code>http://stepstick.local</code> in a browser (or type the IP address shown on the
+            device screen). This is the StepStick settings page.</span>
+        </li>
+        <li>
+          <span class="check">›</span>
+          <span>Copy the <strong>OBS Integration URL</strong> shown at the top of that page.</span>
+        </li>
+        <li>
+          <span class="check">›</span>
+          <span>In OBS, click <strong>+ → Browser Source</strong>, paste the URL, and delete anything in the Custom CSS
+            field so the background is transparent.</span>
+        </li>
+        <li>
+          <span class="check">›</span>
+          <div>
+            <span>Set the <strong>Width</strong> and <strong>Height</strong> for your overlay mode:</span>
+            <table style="margin-top:10px; margin-bottom:10px; width:auto; font-size:0.88rem;">
+              <thead>
+                <tr>
+                  <th>Mode</th>
+                  <th>Width</th>
+                  <th>Height</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Simple (counter only)</td>
+                  <td>200</td>
+                  <td>100</td>
+                </tr>
+                <tr>
+                  <td>Standard (HUD pill)</td>
+                  <td>400</td>
+                  <td>150</td>
+                </tr>
+                <tr>
+                  <td>Advanced (HUD + chart)</td>
+                  <td>450</td>
+                  <td>300</td>
+                </tr>
+              </tbody>
+            </table>
+            <span style="color:var(--muted); font-size:0.88rem;">Treat <strong>Width</strong> as your zoom slider — a
+              larger value scales the widget up. Avoid dragging the red transform handles in OBS to resize, as this
+              stretches and pixelates the font.</span>
+          </div>
+        </li>
+        <li>
+          <span class="check">›</span>
+          <span>Colours, icons, and effects can all be changed on the settings page — the overlay updates automatically
+            when you save.</span>
+        </li>
+      </ol>
+      <div style="margin-top:20px;">
+        <img src="./images/Screenshot_20260525_191421.png" alt="StepStick overlay live inside OBS"
+          style="width:100%; max-width:560px; border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,0.5);">
+      </div>
+    </div>
+
+    <!-- Device controls reference -->
+    <h2 class="section-title" style="margin-top:48px;">Device buttons</h2>
+    <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; margin-bottom:24px;">
+      <img src="./images/m5sticks3-main.webp" alt="M5StickS3 device" style="height:180px; border-radius:8px;">
+      <img src="./images/m5sticks3-detailed.webp" alt="M5StickS3 button layout"
+        style="height:180px; border-radius:8px;">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Button</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>KEY1 (blue button) — short press</td>
+            <td>Wake the screen</td>
+          </tr>
+          <tr>
+            <td>KEY1 (blue button) — hold</td>
+            <td>Zero the step count</td>
+          </tr>
+          <tr>
+            <td>KEY2 (large grey, right) — press</td>
+            <td>Show WiFi reset warning on screen</td>
+          </tr>
+          <tr>
+            <td>KEY2 (large grey, right) — hold</td>
+            <td>Clear saved WiFi credentials and restart</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip" style="margin-top:24px;">
+      <span class="callout-icon">📶</span>
+      <span>Need to change WiFi networks? Scroll back up to Step 3 — you can re-run it at any time with the device
+        plugged in via USB.</span>
+    </div>
+
   </div>
-</nav>
 
-<div class="container">
+  <footer>
+    <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
+    MIT License
+  </footer>
 
-  <h1 style="font-size:2rem; font-weight:800; margin-bottom:8px;">Get Started</h1>
-  <p style="color:var(--muted); margin-bottom:20px;">Flash your M5StickS3, connect it to WiFi, and add the overlay to OBS — all from this page.</p>
+  <script>
+    if (!('serial' in navigator)) {
+      document.getElementById('no-serial').style.display = 'block';
+      document.getElementById('flash-btn').disabled = true;
+      document.getElementById('wifi-btn').disabled = true;
+    }
+  </script>
 
-  <div style="display:flex; align-items:center; gap:16px; background:#1a1000; border:2px solid #ffb400; border-radius:12px; padding:16px 20px; margin-bottom:24px;">
-    <span style="font-size:2rem; flex-shrink:0;">⚠️</span>
-    <div>
-      <strong style="color:#ffb400; font-size:1rem;">This page only works in Chrome or Edge on a desktop PC.</strong>
-      <p style="color:#c8a060; font-size:0.88rem; margin-top:4px;">Safari, Firefox, and mobile browsers do not support the Web Serial API required to flash and configure the device. If you're on the wrong browser, open this page in Chrome or Edge and try again.</p>
-    </div>
-  </div>
+  <script type="module">
+    import { ImprovSerial } from 'https://esm.sh/improv-wifi-serial-sdk@2.5.0/dist/serial.js';
 
-  <div id="no-serial">
-    <strong>Unsupported browser detected.</strong> Switch to Chrome or Edge on a desktop PC to use this page.
-  </div>
+    function setLog(msg, cls = '') {
+      const el = document.getElementById('wifi-log');
+      el.textContent = msg;
+      el.className = cls;
+    }
 
-  <!-- ── Step 1: Flash ── -->
-  <div class="widget">
-    <div class="widget-title">
-      <div class="step-num">1</div>
-      <h2>Flash the firmware</h2>
-    </div>
-    <p>Plug your M5StickS3 into your PC with a USB-C cable, then click the button below. A port picker will appear — select the device and follow the prompts.</p>
+    // SDK v2.5.0 emits numeric states: READY=2, PROVISIONING=3, PROVISIONED=4
+    const STATE_LABELS = {
+      2: 'Device found — sending credentials…',
+      3: 'Connecting to WiFi…',
+    };
 
-    <esp-web-install-button manifest="./manifest.json">
-      <button slot="activate" class="btn btn-primary" id="flash-btn">⚡ Connect &amp; Flash</button>
-    </esp-web-install-button>
+    const ERROR_LABELS = {
+      3: 'Could not connect — double-check your network name and password.',
+      254: 'Timed out waiting for the device to respond.',
+      1: 'Communication error — unplug the device and try again.',
+      2: 'Communication error — unplug the device and try again.',
+      255: 'An unknown error occurred.',
+    };
 
-    <div class="callout tip" style="margin-top:16px;">
-      <span class="callout-icon">💡</span>
-      <span>No port appearing? Try a different cable — many USB-C cables are charge-only and won't work here.</span>
-    </div>
-  </div>
+    document.getElementById('wifi-btn').addEventListener('click', provisionWifi);
 
-  <!-- ── Step 2: Power on ── -->
-  <div class="widget">
-    <div class="widget-title">
-      <div class="step-num">2</div>
-      <h2>Turn the device on</h2>
-    </div>
-    <p>After flashing the screen will go dark. Press the <strong>small grey button on the left side</strong> of the device once to turn it back on. Keep the USB cable plugged in — you'll need it for the next step.</p>
-    <p style="margin-top:8px;">The screen will show <strong>"Connect via USB to setup WiFi"</strong>. That means it's ready.</p>
-    <div style="margin-top:16px;">
-      <img src="./images/m5sticks3-detailed.webp" alt="M5StickS3 — blue power button on the front face" style="height:160px; border-radius:8px;">
-    </div>
-  </div>
+    async function provisionWifi() {
+      const ssid = document.getElementById('wifi-ssid').value.trim();
+      const pass = document.getElementById('wifi-pass').value;
+      if (!ssid) { setLog('Please enter your network name.', 'error'); return; }
 
-  <!-- ── Step 3: WiFi ── -->
-  <div class="widget">
-    <div class="widget-title">
-      <div class="step-num">3</div>
-      <h2>Connect to WiFi</h2>
-    </div>
-    <p>Type in your home network name and password, then click Connect. The device must still be plugged in via USB.</p>
+      const btn = document.getElementById('wifi-btn');
+      btn.disabled = true;
+      document.getElementById('wifi-success').style.display = 'none';
 
-    <div class="field">
-      <label for="wifi-ssid">Network name (SSID)</label>
-      <input type="text" id="wifi-ssid" placeholder="My WiFi" autocomplete="off" spellcheck="false">
-    </div>
-    <div class="field">
-      <label for="wifi-pass">Password</label>
-      <input type="password" id="wifi-pass" placeholder="••••••••" autocomplete="current-password">
-    </div>
+      let improv, port, errorShown = false;
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
 
-    <button class="btn btn-primary" id="wifi-btn">📶 Connect Device</button>
-    <div id="wifi-log"></div>
+        improv = new ImprovSerial(port, console);
 
-    <div id="wifi-success" style="display:none; margin-top:20px; background:#001a14; border:2px solid var(--accent); border-radius:12px; padding:20px 24px; text-align:center; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-      <div style="font-size:2.5rem; margin-bottom:8px;">🎉</div>
-      <div style="font-size:1.1rem; font-weight:800; color:var(--accent); margin-bottom:6px;">Connected to WiFi!</div>
-      <div style="font-size:0.9rem; color:#80ffe8;">The IP address is now showing on the device screen.<br>You can unplug the USB cable and scroll down to Step 4.</div>
-    </div>
+        improv.addEventListener('state-changed', () => {
+          if (improv.state === 4) {  // PROVISIONED
+            setLog('');
+            const banner = document.getElementById('wifi-success');
+            banner.style.display = 'block';
+            banner.style.animation = 'none';
+            banner.offsetHeight; // reflow to restart animation
+            banner.style.animation = '';
+          } else {
+            const label = STATE_LABELS[improv.state] ?? ('State: ' + improv.state);
+            setLog(label, 'pending');
+          }
+        });
 
-    <div class="callout warn" style="margin-top:16px;">
-      <span class="callout-icon">⚠️</span>
-      <span>The M5StickS3 only supports <strong>2.4 GHz</strong> WiFi. If you have separate 2.4 GHz and 5 GHz networks, make sure you pick the 2.4 GHz one.</span>
-    </div>
-  </div>
+        improv.addEventListener('error-changed', () => {
+          const err = improv.error;
+          if (err && err !== 0) {
+            setLog(ERROR_LABELS[err] ?? `Connection failed (code ${err}).`, 'error');
+            errorShown = true;
+          }
+        });
 
-  <!-- ── Step 4: OBS ── -->
-  <div class="widget">
-    <div class="widget-title">
-      <div class="step-num">4</div>
-      <h2>Add to OBS</h2>
-    </div>
-    <p>Once connected, the device's IP address appears on its screen. Use it to add the overlay to your stream.</p>
-
-    <ol class="obs-steps">
-      <li>
-        <span class="check">›</span>
-        <span>On your PC, open <code>http://stepstick.local</code> in a browser (or type the IP address shown on the device screen). This is the StepStick settings page.</span>
-      </li>
-      <li>
-        <span class="check">›</span>
-        <span>Copy the <strong>OBS Integration URL</strong> shown at the top of that page.</span>
-      </li>
-      <li>
-        <span class="check">›</span>
-        <span>In OBS, click <strong>+ → Browser Source</strong>, paste the URL, and delete anything in the Custom CSS field so the background is transparent.</span>
-      </li>
-      <li>
-        <span class="check">›</span>
-        <div>
-          <span>Set the <strong>Width</strong> and <strong>Height</strong> for your overlay mode:</span>
-          <table style="margin-top:10px; margin-bottom:10px; width:auto; font-size:0.88rem;">
-            <thead>
-              <tr><th>Mode</th><th>Width</th><th>Height</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Simple (counter only)</td><td>200</td><td>100</td></tr>
-              <tr><td>Standard (HUD pill)</td><td>400</td><td>150</td></tr>
-              <tr><td>Advanced (HUD + chart)</td><td>450</td><td>300</td></tr>
-            </tbody>
-          </table>
-          <span style="color:var(--muted); font-size:0.88rem;">Treat <strong>Width</strong> as your zoom slider — a larger value scales the widget up. Avoid dragging the red transform handles in OBS to resize, as this stretches and pixelates the font.</span>
-        </div>
-      </li>
-      <li>
-        <span class="check">›</span>
-        <span>Colours, icons, and effects can all be changed on the settings page — the overlay updates automatically when you save.</span>
-      </li>
-    </ol>
-    <div style="margin-top:20px;">
-      <img src="./images/Screenshot_20260525_191421.png" alt="StepStick overlay live inside OBS" style="width:100%; max-width:560px; border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,0.5);">
-    </div>
-  </div>
-
-  <!-- Device controls reference -->
-  <h2 class="section-title" style="margin-top:48px;">Device buttons</h2>
-  <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; margin-bottom:24px;">
-    <img src="./images/m5sticks3-main.webp" alt="M5StickS3 device" style="height:180px; border-radius:8px;">
-    <img src="./images/m5sticks3-detailed.webp" alt="M5StickS3 button layout" style="height:180px; border-radius:8px;">
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Button</th><th>Action</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>KEY1 (blue button) — short press</td><td>Wake the screen</td></tr>
-        <tr><td>KEY1 (blue button) — hold</td><td>Zero the step count</td></tr>
-        <tr><td>KEY2 (large grey, right) — press</td><td>Show WiFi reset warning on screen</td></tr>
-        <tr><td>KEY2 (large grey, right) — hold</td><td>Clear saved WiFi credentials and restart</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="callout tip" style="margin-top:24px;">
-    <span class="callout-icon">📶</span>
-    <span>Need to change WiFi networks? Scroll back up to Step 3 — you can re-run it at any time with the device plugged in via USB.</span>
-  </div>
-
-</div>
-
-<footer>
-  <a href="https://github.com/jhlwscom/stepstick">GitHub</a> &nbsp;·&nbsp;
-  MIT License
-</footer>
-
-<script>
-if (!('serial' in navigator)) {
-  document.getElementById('no-serial').style.display = 'block';
-  document.getElementById('flash-btn').disabled = true;
-  document.getElementById('wifi-btn').disabled = true;
-}
-</script>
-
-<script type="module">
-import { ImprovSerial } from 'https://esm.sh/improv-wifi-serial-sdk@2.5.0/dist/serial.js';
-
-function setLog(msg, cls = '') {
-  const el = document.getElementById('wifi-log');
-  el.textContent = msg;
-  el.className = cls;
-}
-
-const STATE_LABELS = {
-  'awaiting-authorization': 'Waiting for authorisation…',
-  'authorized':             'Authorised — sending credentials…',
-  'provisioning':           'Connecting to WiFi…',
-  'provisioned':            '✓ Connected! The IP address will appear on the device screen.',
-};
-
-document.getElementById('wifi-btn').addEventListener('click', provisionWifi);
-
-async function provisionWifi() {
-  const ssid = document.getElementById('wifi-ssid').value.trim();
-  const pass = document.getElementById('wifi-pass').value;
-  if (!ssid) { setLog('Please enter your network name.', 'error'); return; }
-
-  const btn = document.getElementById('wifi-btn');
-  btn.disabled = true;
-
-  let improv, port;
-  try {
-    port = await navigator.serial.requestPort();
-    await port.open({ baudRate: 115200 });
-
-    improv = new ImprovSerial(port, console);
-
-    improv.addEventListener('state-changed', () => {
-      if (improv.state === 'provisioned') {
-        setLog('');
-        const banner = document.getElementById('wifi-success');
-        banner.style.display = 'block';
-        banner.style.animation = 'none';
-        banner.offsetHeight; // reflow to restart animation
-        banner.style.animation = '';
-      } else {
-        const label = STATE_LABELS[improv.state] ?? ('State: ' + improv.state);
-        setLog(label);
+        setLog('Opening serial port…', 'pending');
+        await new Promise(r => setTimeout(r, 1000));
+        await improv.initialize(10000);
+        await improv.provision(ssid, pass, 20000);
+      } catch (e) {
+        if (e?.name !== 'NotFoundError' && !errorShown) {
+          const msg = typeof e === 'string' ? e : (e?.message ?? String(e));
+          setLog('Error: ' + msg, 'error');
+        }
+      } finally {
+        if (improv) try { await improv.close(); } catch { }
+        else if (port) try { await port.close(); } catch { }
+        btn.disabled = false;
       }
-    });
-
-    improv.addEventListener('error-changed', () => {
-      if (improv.error && improv.error !== 'no-error') {
-        setLog('Error: ' + improv.error, 'error');
-      }
-    });
-
-    setLog('Connecting to device…');
-    await new Promise(r => setTimeout(r, 1000));
-    await improv.initialize(10000);
-    await improv.provision(ssid, pass, 20000);
-  } catch (e) {
-    if (e.name !== 'NotFoundError')
-      setLog('Error: ' + e.message, 'error');
-  } finally {
-    if (improv) try { await improv.close(); } catch {}
-    else if (port) try { await port.close(); } catch {}
-    btn.disabled = false;
-  }
-}
-</script>
+    }
+  </script>
 
 </body>
+
 </html>

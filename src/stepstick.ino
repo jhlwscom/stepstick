@@ -34,7 +34,10 @@ int batteryLevel = 0;
 unsigned long lastInteractionTime = 0;
 const unsigned long SCREEN_TIMEOUT = 15000;
 bool isScreenOn = true;
-bool wifiResetWarning = false;
+enum class ResetState : uint8_t { IDLE, WARNING, ARMED, HOLDING };
+ResetState resetState = ResetState::IDLE;
+unsigned long resetHoldStart = 0;
+int resetCountdownLast = -1;
 bool displayDirty = true;
 
 // --- Overlay Modes ---
@@ -896,6 +899,32 @@ void wakeScreen() {
   lastInteractionTime = millis();
 }
 
+void drawResetWarning() {
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setFont(&fonts::FreeSans9pt7b);
+  M5.Display.setTextColor(TFT_YELLOW, TFT_BLACK);
+  M5.Display.drawString("Hold B to reset", M5.Display.width() / 2,
+                        M5.Display.height() / 2 - 10);
+  M5.Display.drawString("WiFi credentials", M5.Display.width() / 2,
+                        M5.Display.height() / 2 + 10);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+}
+
+void drawResetCountdown(int seconds) {
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setFont(&fonts::FreeSans9pt7b);
+  M5.Display.setTextColor(TFT_YELLOW, TFT_BLACK);
+  M5.Display.drawString("Resetting WiFi in", M5.Display.width() / 2,
+                        M5.Display.height() / 2 - 28);
+  M5.Display.setFont(&fonts::FreeSansBold24pt7b);
+  M5.Display.setTextColor(TFT_RED, TFT_BLACK);
+  M5.Display.drawString(String(seconds), M5.Display.width() / 2,
+                        M5.Display.height() / 2 + 10);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+}
+
 // Fallback logic for empty string values
 String getIconStr(int state) {
   if (state == 0)
@@ -1054,33 +1083,68 @@ void loop() {
     stepOffset = hwStepCount;
     displaySteps = 0;
     lastBroadcastSteps = 0;
-    wifiResetWarning = false;
+    resetState = ResetState::IDLE;
+    displayDirty = true;
     wakeScreen();
   } else if (M5.BtnA.wasPressed()) {
-    wifiResetWarning = false;
+    resetState = ResetState::IDLE;
+    displayDirty = true;
     wakeScreen();
   }
 
-  if (M5.BtnB.wasHold()) {
-    if (wifiResetWarning) {
-      wakeScreen();
-      M5.Display.fillScreen(TFT_BLACK);
-      M5.Display.drawString("Clearing WiFi...", M5.Display.width() / 2,
-                            M5.Display.height() / 2);
-      WiFi.disconnect(true, true);
-      delay(500);
-      ESP.restart();
-    }
-  } else if (M5.BtnB.wasPressed()) {
-    wakeScreen();
-    wifiResetWarning = true;
-    M5.Display.fillScreen(TFT_BLACK);
-    M5.Display.setTextColor(TFT_YELLOW, TFT_BLACK);
-    M5.Display.drawString("Hold B to reset", M5.Display.width() / 2,
-                          M5.Display.height() / 2 - 10);
-    M5.Display.drawString("WiFi credentials", M5.Display.width() / 2,
-                          M5.Display.height() / 2 + 10);
-    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  // WiFi reset state machine — requires release between warning and hold
+  switch (resetState) {
+    case ResetState::IDLE:
+      if (M5.BtnB.wasPressed()) {
+        wakeScreen();
+        drawResetWarning();
+        resetState = ResetState::WARNING;
+        resetCountdownLast = -1;
+      }
+      break;
+
+    case ResetState::WARNING:
+      // Wait for button to be released before arming
+      if (!M5.BtnB.isPressed()) {
+        resetState = ResetState::ARMED;
+      }
+      break;
+
+    case ResetState::ARMED:
+      if (M5.BtnB.isPressed()) {
+        resetHoldStart = millis();
+        resetCountdownLast = -1;
+        resetState = ResetState::HOLDING;
+      }
+      break;
+
+    case ResetState::HOLDING:
+      if (!M5.BtnB.isPressed()) {
+        // Released before countdown finished — stay at warning screen
+        drawResetWarning();
+        resetState = ResetState::ARMED;
+        resetCountdownLast = -1;
+      } else {
+        unsigned long elapsed = millis() - resetHoldStart;
+        int secondsLeft = 3 - (int)(elapsed / 1000);
+        if (secondsLeft < 0) secondsLeft = 0;
+        if (secondsLeft != resetCountdownLast) {
+          resetCountdownLast = secondsLeft;
+          drawResetCountdown(secondsLeft);
+        }
+        if (elapsed >= 3000) {
+          M5.Display.fillScreen(TFT_BLACK);
+          M5.Display.setTextDatum(middle_center);
+          M5.Display.setFont(&fonts::FreeSans9pt7b);
+          M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+          M5.Display.drawString("Clearing WiFi...", M5.Display.width() / 2,
+                                M5.Display.height() / 2);
+          WiFi.disconnect(true, true);
+          delay(500);
+          ESP.restart();
+        }
+      }
+      break;
   }
 
   if (isScreenOn && (millis() - lastInteractionTime > SCREEN_TIMEOUT)) {
@@ -1165,8 +1229,8 @@ void loop() {
     }
   }
 
-  if (wifiResetWarning)
-    return; // hold display until dismissed or confirmed
+  if (resetState != ResetState::IDLE)
+    return; // hold display until reset flow is dismissed or confirmed
   if (isScreenOn) {
     static uint32_t lastDrawnSteps = UINT32_MAX;
     static int lastDrawnBattery = -1;
