@@ -5,10 +5,14 @@
 #include <M5Unified.h>
 #include <Preferences.h>
 #include <SparkFun_BMI270_Arduino_Library.h>
+#include <HTTPUpdate.h>
 #include <WebServer.h>
 #include <WebSocketsServer.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <esp_wifi.h>
+
+#define GITHUB_REPO "jhlwscom/stepstick"
 
 BMI270 imu;
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -39,6 +43,10 @@ ResetState resetState = ResetState::IDLE;
 unsigned long resetHoldStart = 0;
 int resetCountdownLast = -1;
 bool displayDirty = true;
+
+// --- OTA Update ---
+static bool otaUpdatePending = false;
+static String otaPendingUrl;
 
 // --- Overlay Modes ---
 int overlayMode = 1; // 0 = Simple, 1 = Standard, 2 = Advanced
@@ -224,7 +232,7 @@ const char *configHTML = R"rawliteral(
     </style>
 </head>
 <body>
-    %MDNS_WARNING%
+    <div id="mdns-warning"></div>
     <div class='card'>
         <h2>OBS Integration</h2>
         <div class="help-text">Add this URL as a Browser Source (Clear custom CSS)</div>
@@ -238,7 +246,28 @@ const char *configHTML = R"rawliteral(
         <h2>Dashboard Controls</h2>
         <button class='btn' type='button' id='btn-reset-steps'>Reset Step Count</button>
     </div>
-    
+
+    <div class='card'>
+        <h2>Firmware Update</h2>
+        <div class="form-group">
+            <div>
+                <label>Installed version</label>
+                <div class="help-text" id="version-text">...</div>
+            </div>
+            <button class="btn" style="width:auto;padding:10px 16px;font-size:0.9rem" type="button" id="btn-check-update">Check for Updates</button>
+        </div>
+        <div id="ota-available" style="display:none;padding-top:4px">
+            <div id="ota-available-msg" style="color:var(--accent);font-weight:600;margin-bottom:12px"></div>
+            <button class="btn btn-save" type="button" id="btn-do-update">Install Update</button>
+        </div>
+        <div id="ota-current" style="display:none;color:var(--text-muted);font-size:0.85rem;padding-top:4px"></div>
+        <div id="ota-error" style="display:none;color:var(--danger);font-size:0.85rem;padding-top:4px"></div>
+        <div id="ota-progress" style="display:none;text-align:center;padding:12px 0">
+            <div style="color:var(--accent);font-weight:600;margin-bottom:4px">Updating firmware...</div>
+            <div style="color:var(--text-muted);font-size:0.85rem">Do not power off. Waiting for restart...</div>
+        </div>
+    </div>
+
     <div class='card'>
         <h2>Overlay Settings</h2>
         <form id='theme-form'>
@@ -246,9 +275,9 @@ const char *configHTML = R"rawliteral(
             <div class="form-group col" style="margin-bottom: 24px;">
                 <label>Active Overlay Mode</label>
                 <select name="overlayMode" id="mode-select">
-                    <option value="0" %MODE0%>Simple (Counter Only)</option>
-                    <option value="1" %MODE1%>Standard (HUD)</option>
-                    <option value="2" %MODE2%>Advanced (HUD + Stats)</option>
+                    <option value="0">Simple (Counter Only)</option>
+                    <option value="1">Standard (HUD)</option>
+                    <option value="2">Advanced (HUD + Stats)</option>
                 </select>
             </div>
 
@@ -256,9 +285,9 @@ const char *configHTML = R"rawliteral(
                 <label>Power &amp; Responsivity Mode</label>
                 <div class="help-text">Controls background update speed when screen is off</div>
                 <select name="powerMode">
-                    <option value="0" %PWR0%>Performance (Fastest UI, High Drain)</option>
-                    <option value="1" %PWR1%>Balanced (1-sec updates, Default)</option>
-                    <option value="2" %PWR2%>Battery Saver (Slow updates, Max Life)</option>
+                    <option value="0">Performance (Fastest UI, High Drain)</option>
+                    <option value="1">Balanced (1-sec updates, Default)</option>
+                    <option value="2">Battery Saver (Slow updates, Max Life)</option>
                 </select>
             </div>
 
@@ -271,11 +300,11 @@ const char *configHTML = R"rawliteral(
                 <div class="form-group col">
                     <label>Font Family</label>
                     <div class="help-text">Available Google Font name (e.g. 'Roboto', 'Inter')</div>
-                    <input type="text" name="simpleFont" value="%SFONT%">
+                    <input type="text" name="simpleFont">
                 </div>
                 <div class="form-group">
                     <label>Counter Color</label>
-                    <input type="color" name="simpleColor" value="%SCOLOR%">
+                    <input type="color" name="simpleColor">
                 </div>
             </div>
 
@@ -283,34 +312,34 @@ const char *configHTML = R"rawliteral(
                 <div class="form-group col">
                     <label>Still Icon</label>
                     <div class="help-text">Emoji or direct image URL (Leave blank for 🧍)</div>
-                    <input type="text" name="iconStill" value="%ISTILL%">
+                    <input type="text" name="iconStill">
                 </div>
                 <div class="form-group col">
                     <label>Walk Icon</label>
                     <div class="help-text">Emoji or direct image URL (Leave blank for 🚶)</div>
-                    <input type="text" name="iconWalk" value="%IWALK%">
+                    <input type="text" name="iconWalk">
                 </div>
                 <div class="form-group col">
                     <label>Run Icon</label>
                     <div class="help-text">Emoji or direct image URL (Leave blank for 🏃)</div>
-                    <input type="text" name="iconRun" value="%IRUN%">
+                    <input type="text" name="iconRun">
                 </div>
                 
                 <div class="form-group">
                     <label>Background</label>
-                    <input type="color" name="bgColor" value="%BG%">
+                    <input type="color" name="bgColor">
                 </div>
                 <div class="form-group">
                     <label>Main Text</label>
-                    <input type="color" name="textColor" value="%TEXT%">
+                    <input type="color" name="textColor">
                 </div>
                 <div class="form-group">
                     <label>Walk Highlight</label>
-                    <input type="color" name="walkColor" value="%WALK%">
+                    <input type="color" name="walkColor">
                 </div>
                 <div class="form-group">
                     <label>Run Highlight</label>
-                    <input type="color" name="runColor" value="%RUN%">
+                    <input type="color" name="runColor">
                 </div>
 
                 <div class="form-group">
@@ -319,7 +348,7 @@ const char *configHTML = R"rawliteral(
                         <div class="help-text">Mutes icons when standing still</div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" name="grey" %GREY%>
+                        <input type="checkbox" name="grey">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -329,7 +358,7 @@ const char *configHTML = R"rawliteral(
                         <div class="help-text">Adds neon drop-shadow when moving</div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" name="glow" %GLOW%>
+                        <input type="checkbox" name="glow">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -339,7 +368,7 @@ const char *configHTML = R"rawliteral(
                         <div class="help-text">Displays the status icon in Standard/Advanced modes</div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" name="emoji" %EMOJI%>
+                        <input type="checkbox" name="emoji">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -388,15 +417,42 @@ const char *configHTML = R"rawliteral(
             });
         });
 
-        // Smart dropdown: changing mode automatically flips to the relevant tab
         const modeSelect = document.getElementById('mode-select');
         modeSelect.addEventListener('change', (e) => {
             if (e.target.value === "0") switchTab('tab-simple');
             else switchTab('tab-hud');
         });
 
-        // Initialize correct tab on load based on saved mode
-        if (modeSelect.value !== "0") switchTab('tab-hud');
+        // Fetch config from device, populate form, show mDNS hint
+        let deviceVersion = 'dev';
+        fetch('/api/config').then(r => r.json()).then(cfg => {
+            deviceVersion = cfg.version;
+            document.getElementById('version-text').textContent = 'v' + cfg.version;
+
+            if (window.location.hostname.endsWith('.local')) {
+                const ipUrl = 'http://' + cfg.ip + '/';
+                const w = document.getElementById('mdns-warning');
+                w.style.cssText = 'background:#7c5a00;color:#ffe;padding:10px 16px;font-size:13px;text-align:center;margin-bottom:20px';
+                w.innerHTML = 'Tip: <a href="' + ipUrl + '" style="color:#ffd">' + ipUrl + '</a> loads faster than stepstick.local';
+            }
+
+            document.querySelector('[name="overlayMode"]').value = cfg.overlayMode;
+            document.querySelector('[name="powerMode"]').value   = cfg.powerMode;
+            document.querySelector('[name="simpleFont"]').value  = cfg.simpleFont;
+            document.querySelector('[name="simpleColor"]').value = cfg.simpleColor;
+            document.querySelector('[name="bgColor"]').value     = cfg.bg;
+            document.querySelector('[name="textColor"]').value   = cfg.text;
+            document.querySelector('[name="walkColor"]').value   = cfg.walk;
+            document.querySelector('[name="runColor"]').value    = cfg.run;
+            document.querySelector('[name="iconStill"]').value   = cfg.iconStill;
+            document.querySelector('[name="iconWalk"]').value    = cfg.iconWalk;
+            document.querySelector('[name="iconRun"]').value     = cfg.iconRun;
+            document.querySelector('[name="grey"]').checked  = cfg.grey;
+            document.querySelector('[name="glow"]').checked  = cfg.glow;
+            document.querySelector('[name="emoji"]').checked = cfg.emoji;
+
+            if (cfg.overlayMode !== 0) switchTab('tab-hud');
+        });
 
         // Async Save Settings
         document.getElementById('theme-form').addEventListener('submit', function(e) {
@@ -404,7 +460,6 @@ const char *configHTML = R"rawliteral(
             const btn = document.getElementById('btn-save');
             const originalText = btn.innerText;
             btn.innerText = 'Saving...';
-            
             fetch('/savetheme', { method: 'POST', body: new FormData(this) })
                 .then(response => {
                     btn.innerText = originalText;
@@ -414,18 +469,74 @@ const char *configHTML = R"rawliteral(
 
         // Async Reset Steps
         document.getElementById('btn-reset-steps').addEventListener('click', function() {
-            fetch('/reset', { method: 'POST' }).then(response => {
-                if(response.ok) showToast("Step Count Reset!");
+            fetch('/reset', { method: 'POST' }).then(r => { if(r.ok) showToast("Step Count Reset!"); });
+        });
+
+        // Async Factory Reset
+        document.getElementById('btn-reset-config').addEventListener('click', function() {
+            if(confirm("Are you sure you want to revert all overlay settings to default?")) {
+                fetch('/resetconfig', { method: 'POST' }).then(r => { if(r.ok) window.location.href = '/'; });
+            }
+        });
+
+        // OTA: CalVer comparison (YYYY.M.PATCH) — done in the browser against GitHub API directly
+        function calVerIsNewer(a, b) {
+            const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+            for (let i = 0; i < 3; i++) {
+                if ((pa[i]||0) !== (pb[i]||0)) return (pa[i]||0) > (pb[i]||0);
+            }
+            return false;
+        }
+
+        let otaUpdateUrl = null;
+        document.getElementById('btn-check-update').addEventListener('click', function() {
+            const btn = this;
+            btn.textContent = 'Checking...';
+            btn.disabled = true;
+            ['ota-available','ota-current','ota-error'].forEach(id => document.getElementById(id).style.display = 'none');
+            fetch('https://api.github.com/repos/jhlwscom/stepstick/releases/latest', {
+                headers: { 'Accept': 'application/vnd.github+json' }
+            }).then(r => r.json()).then(data => {
+                btn.textContent = 'Check for Updates';
+                btn.disabled = false;
+                const latest = data.tag_name;
+                if (!latest) throw new Error('no tag');
+                const needsUpdate = deviceVersion === 'dev' || calVerIsNewer(latest, deviceVersion);
+                if (needsUpdate) {
+                    otaUpdateUrl = 'https://github.com/jhlwscom/stepstick/releases/download/' + latest + '/firmware.bin';
+                    document.getElementById('ota-available-msg').textContent = 'Update available: v' + latest;
+                    document.getElementById('ota-available').style.display = 'block';
+                } else {
+                    document.getElementById('ota-current').textContent = 'Already up to date (v' + deviceVersion + ')';
+                    document.getElementById('ota-current').style.display = 'block';
+                }
+            }).catch(() => {
+                btn.textContent = 'Check for Updates';
+                btn.disabled = false;
+                document.getElementById('ota-error').textContent = 'Could not reach GitHub. Check internet connection.';
+                document.getElementById('ota-error').style.display = 'block';
             });
         });
 
-        // Async Reset Customizations
-        document.getElementById('btn-reset-config').addEventListener('click', function() {
-            if(confirm("Are you sure you want to revert all overlay settings to default?")) {
-                fetch('/resetconfig', { method: 'POST' }).then(response => {
-                    if(response.ok) window.location.href = '/';
-                });
-            }
+        document.getElementById('btn-do-update').addEventListener('click', function() {
+            if (!otaUpdateUrl || !confirm('Install update? The device will restart automatically.')) return;
+            document.getElementById('ota-available').style.display = 'none';
+            document.getElementById('btn-check-update').disabled = true;
+            document.getElementById('ota-progress').style.display = 'block';
+            const fd = new FormData();
+            fd.append('url', otaUpdateUrl);
+            fetch('/ota/update', { method: 'POST', body: fd }).then(() => {
+                const poll = setInterval(() => {
+                    fetch('/', { cache: 'no-store', signal: AbortSignal.timeout(2000) })
+                        .then(() => { clearInterval(poll); location.reload(); })
+                        .catch(() => {});
+                }, 3000);
+            }).catch(() => {
+                document.getElementById('ota-progress').style.display = 'none';
+                document.getElementById('btn-check-update').disabled = false;
+                document.getElementById('ota-error').textContent = 'Update request failed. Try again.';
+                document.getElementById('ota-error').style.display = 'block';
+            });
         });
     </script>
 </body>
@@ -656,48 +767,112 @@ const char *overlayHTML = R"rawliteral(
 </html>
 )rawliteral";
 
+// --- OTA + CONFIG API ---
+
+static String jsonEsc(const String& s) {
+  String out;
+  out.reserve(s.length() + 4);
+  for (unsigned int i = 0; i < s.length(); i++) {
+    char c = s[i];
+    if (c == '"') out += "\\\"";
+    else if (c == '\\') out += "\\\\";
+    else out += c;
+  }
+  return out;
+}
+
+void handleApiConfig() {
+  String body;
+  body.reserve(6800);
+  body += "{\"version\":\"";     body += FIRMWARE_VERSION;
+  body += "\",\"ip\":\"";        body += WiFi.localIP().toString();
+  body += "\",\"overlayMode\":"; body += overlayMode;
+  body += ",\"powerMode\":";     body += powerMode;
+  body += ",\"simpleFont\":\"";  body += jsonEsc(simpleFont);
+  body += "\",\"simpleColor\":\""; body += simpleColor;
+  body += "\",\"bg\":\"";        body += themeBgColor;
+  body += "\",\"text\":\"";      body += themeTextColor;
+  body += "\",\"walk\":\"";      body += themeWalkColor;
+  body += "\",\"run\":\"";       body += themeRunColor;
+  body += "\",\"iconStill\":\""; body += jsonEsc(iconStill);
+  body += "\",\"iconWalk\":\"";  body += jsonEsc(iconWalk);
+  body += "\",\"iconRun\":\"";   body += jsonEsc(iconRun);
+  body += "\",\"glow\":";        body += themeGlow ? "true" : "false";
+  body += ",\"grey\":";          body += themeGreyscale ? "true" : "false";
+  body += ",\"emoji\":";         body += themeShowEmoji ? "true" : "false";
+  body += "}";
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", body);
+}
+
+void handleOtaUpdate() {
+  if (!server.hasArg("url")) {
+    server.send(400, "application/json", "{\"error\":\"missing_url\"}");
+    return;
+  }
+  String url = server.arg("url");
+  String prefix = "https://github.com/" GITHUB_REPO "/releases/download/";
+  if (!url.startsWith(prefix) || !url.endsWith("/firmware.bin")) {
+    server.send(400, "application/json", "{\"error\":\"invalid_url\"}");
+    return;
+  }
+  otaUpdatePending = true;
+  otaPendingUrl = url;
+  server.send(200, "application/json", "{\"status\":\"started\"}");
+}
+
+// GitHub release URLs redirect to objects.githubusercontent.com. HTTPUpdate reuses
+// the same WiFiClientSecure across the redirect and doesn't re-establish the SSL
+// session for the new host — resolve the redirect with a cheap HEAD request first.
+static String resolveGitHubUrl(const String& url) {
+  WiFiClientSecure c;
+  c.setInsecure();
+  HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  const char* hdrs[] = {"Location"};
+  http.collectHeaders(hdrs, 1);
+  if (!http.begin(c, url)) return url;
+  int code = http.sendRequest("HEAD");
+  String resolved;
+  if (code >= 300 && code < 400 && http.hasHeader("Location"))
+    resolved = http.header("Location");
+  http.end();
+  return resolved.length() > 0 ? resolved : url;
+}
+
+void performOtaUpdate(const String& url) {
+  M5.Display.wakeup();
+  M5.Display.setBrightness(255);
+  isScreenOn = true;
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setFont(&fonts::FreeSans9pt7b);
+  M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
+  M5.Display.drawString("Updating...", M5.Display.width() / 2, M5.Display.height() / 2 - 10);
+  M5.Display.drawString("Do not power off", M5.Display.width() / 2, M5.Display.height() / 2 + 10);
+
+  String finalUrl = resolveGitHubUrl(url);
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  httpUpdate.rebootOnUpdate(true);
+  t_httpUpdate_return ret = httpUpdate.update(client, finalUrl);
+
+  // Only reached on failure (success reboots the device)
+  String errStr = httpUpdate.getLastErrorString()
+                + " (" + String(httpUpdate.getLastError()) + ")";
+  M5.Display.fillScreen(TFT_RED);
+  M5.Display.setTextColor(TFT_WHITE, TFT_RED);
+  M5.Display.drawString("Update failed", M5.Display.width() / 2, M5.Display.height() / 2 - 10);
+  M5.Display.drawString(errStr, M5.Display.width() / 2, M5.Display.height() / 2 + 10);
+  delay(4000);
+  ESP.restart();
+}
+
 // --- WEB ROUTE HANDLERS ---
 void handleRoot() {
-  String html;
-  html.reserve(strlen(configHTML) + 700);
-  html = configHTML;
-
-  // Insert mode selection states
-  html.replace("%MODE0%", overlayMode == 0 ? "selected" : "");
-  html.replace("%MODE1%", overlayMode == 1 ? "selected" : "");
-  html.replace("%MODE2%", overlayMode == 2 ? "selected" : "");
-  html.replace("%SCOLOR%", simpleColor);
-  html.replace("%SFONT%", simpleFont);
-
-  // Existing theme replacements
-  html.replace("%BG%", themeBgColor);
-  html.replace("%TEXT%", themeTextColor);
-  html.replace("%WALK%", themeWalkColor);
-  html.replace("%RUN%", themeRunColor);
-  html.replace("%ISTILL%", iconStill);
-  html.replace("%IWALK%", iconWalk);
-  html.replace("%IRUN%", iconRun);
-  html.replace("%GREY%", themeGreyscale ? "checked" : "");
-  html.replace("%GLOW%", themeGlow ? "checked" : "");
-  html.replace("%EMOJI%", themeShowEmoji ? "checked" : "");
-  html.replace("%PWR0%", powerMode == 0 ? "selected" : "");
-  html.replace("%PWR1%", powerMode == 1 ? "selected" : "");
-  html.replace("%PWR2%", powerMode == 2 ? "selected" : "");
-
-  String mdnsWarning = "";
-  if (server.hostHeader().endsWith(".local")) {
-    String ipUrl = "http://" + WiFi.localIP().toString() + "/";
-    mdnsWarning = "<div style='background:#7c5a00;color:#ffe;padding:10px 16px;"
-                  "font-size:13px;text-align:center'>"
-                  "Tip: <a href='" +
-                  ipUrl + "' style='color:#ffd'>" + ipUrl +
-                  "</a>"
-                  " loads faster than stepstick.local</div>";
-  }
-  html.replace("%MDNS_WARNING%", mdnsWarning);
-
-  server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "text/html", html);
+  server.send(200, "text/html", configHTML);
 }
 
 void handleOverlay() {
@@ -1071,12 +1246,19 @@ void setup() {
   server.on("/savetheme", HTTP_POST, handleSaveTheme);
   server.on("/reset", HTTP_POST, handleReset);
   server.on("/resetconfig", HTTP_POST, handleResetConfig);
+  server.on("/api/config", HTTP_GET, handleApiConfig);
+  server.on("/ota/update", HTTP_POST, handleOtaUpdate);
   server.begin();
 
   lastInteractionTime = millis();
 }
 
 void loop() {
+  if (otaUpdatePending) {
+    otaUpdatePending = false;
+    performOtaUpdate(otaPendingUrl);
+  }
+
   M5.update();
   improvSerial.handleSerial();
   webSocket.loop();
