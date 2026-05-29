@@ -96,24 +96,6 @@ jobs:
             .pio/build/m5stack-sticks3/partitions.bin
             .pio/build/m5stack-sticks3/firmware.bin
 
-      - name: Stage firmware for Pages
-        run: |
-          cp .pio/build/m5stack-sticks3/bootloader.bin docs/bootloader.bin
-          cp .pio/build/m5stack-sticks3/partitions.bin docs/partition-table.bin
-          cp .pio/build/m5stack-sticks3/firmware.bin   docs/firmware.bin
-          jq '.version = "${{ steps.ver.outputs.version }}"' \
-            docs/manifest.json > docs/manifest.tmp.json
-          mv docs/manifest.tmp.json docs/manifest.json
-
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: firmware-docs
-          path: |
-            docs/bootloader.bin
-            docs/partition-table.bin
-            docs/firmware.bin
-            docs/manifest.json
 
   deploy:
     needs: [changes, firmware]
@@ -125,12 +107,19 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Download firmware artifact
-        if: needs.firmware.result == 'success'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: firmware-docs
-          path: docs/
+      - name: Download firmware from latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST_TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
+          gh release download "$LATEST_TAG" \
+            --pattern "bootloader.bin" \
+            --pattern "partitions.bin" \
+            --pattern "firmware.bin" \
+            --dir docs/
+          mv docs/partitions.bin docs/partition-table.bin
+          jq --arg v "$LATEST_TAG" '.version = $v' docs/manifest.json > docs/manifest.tmp.json
+          mv docs/manifest.tmp.json docs/manifest.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
