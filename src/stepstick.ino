@@ -30,8 +30,6 @@ uint32_t displaySteps = 0;
 uint32_t lastBroadcastSteps = 0;
 Activity currentActivity = STILL;
 Activity lastActivity = UNKNOWN;
-Activity lastSentActivity = STILL;
-String activityString = "🧍";
 int batteryLevel = 0;
 
 // --- Power Management ---
@@ -48,37 +46,18 @@ bool displayDirty = true;
 static bool otaUpdatePending = false;
 static String otaPendingUrl;
 
-// --- Overlay Modes ---
-int overlayMode = 1; // 0 = Simple, 1 = Standard, 2 = Advanced
-int powerMode = 1;   // 0 = Performance, 1 = Balanced, 2 = Battery Saver
-String simpleFont;
-String simpleColor;
-
-// --- Theme Variables ---
-String themeBgColor;
-String themeTextColor;
-String themeWalkColor;
-String themeRunColor;
-
-String iconStill;
-String iconWalk;
-String iconRun;
-
-bool themeGlow = true;
-bool themeGreyscale = true;
-bool themeShowEmoji = true;
+int powerMode = 1; // 0 = Performance, 1 = Balanced, 2 = Battery Saver
 
 // --- Helper: Secure JSON Generation ---
 String buildStateJson() {
-  // Prevent JSON injection by escaping quotes in the activity string
-  String escapedActivity = activityString;
-  escapedActivity.replace("\"", "\\\"");
+  const char *icon = "🧍";
+  if (currentActivity == WALKING) icon = "🚶";
+  else if (currentActivity == RUNNING) icon = "🏃";
 
-  char jsonBuffer[256];
+  char jsonBuffer[128];
   snprintf(jsonBuffer, sizeof(jsonBuffer),
-           "{\"steps\":%lu,\"state\":%d,\"activity\":\"%s\",\"battery\":%d}",
-           displaySteps, currentActivity, escapedActivity.c_str(),
-           batteryLevel);
+           "{\"steps\":%u,\"state\":%d,\"activity\":\"%s\",\"battery\":%d}",
+           (unsigned)displaySteps, (int)currentActivity, icon, batteryLevel);
   return String(jsonBuffer);
 }
 
@@ -100,38 +79,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
 
 // --- OTA + CONFIG API ---
 
-static String jsonEsc(const String& s) {
-  String out;
-  out.reserve(s.length() + 4);
-  for (unsigned int i = 0; i < s.length(); i++) {
-    char c = s[i];
-    if (c == '"') out += "\\\"";
-    else if (c == '\\') out += "\\\\";
-    else out += c;
-  }
-  return out;
-}
-
 void handleApiConfig() {
-  String body;
-  body.reserve(6800);
-  body += "{\"version\":\"";     body += FIRMWARE_VERSION;
-  body += "\",\"ip\":\"";        body += WiFi.localIP().toString();
-  body += "\",\"overlayMode\":"; body += overlayMode;
-  body += ",\"powerMode\":";     body += powerMode;
-  body += ",\"simpleFont\":\"";  body += jsonEsc(simpleFont);
-  body += "\",\"simpleColor\":\""; body += simpleColor;
-  body += "\",\"bg\":\"";        body += themeBgColor;
-  body += "\",\"text\":\"";      body += themeTextColor;
-  body += "\",\"walk\":\"";      body += themeWalkColor;
-  body += "\",\"run\":\"";       body += themeRunColor;
-  body += "\",\"iconStill\":\""; body += jsonEsc(iconStill);
-  body += "\",\"iconWalk\":\"";  body += jsonEsc(iconWalk);
-  body += "\",\"iconRun\":\"";   body += jsonEsc(iconRun);
-  body += "\",\"glow\":";        body += themeGlow ? "true" : "false";
-  body += ",\"grey\":";          body += themeGreyscale ? "true" : "false";
-  body += ",\"emoji\":";         body += themeShowEmoji ? "true" : "false";
-  body += "}";
+  char body[128];
+  snprintf(body, sizeof(body),
+           "{\"version\":\"%s\",\"ip\":\"%s\",\"powerMode\":%d}",
+           FIRMWARE_VERSION, WiFi.localIP().toString().c_str(), powerMode);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", body);
 }
@@ -207,185 +159,14 @@ void handleRoot() {
 }
 
 void handleOverlay() {
-  String html;
-  html.reserve(strlen(overlayHTML) + 512);
-  html = overlayHTML;
-
-  html.replace("%OVERLAY_MODE%", String(overlayMode));
-  html.replace("%SFONT%", simpleFont);
-  html.replace("%SCOLOR%", simpleColor);
-
-  String dynamicCSS = ":root {\n";
-  dynamicCSS += "--bg-color: " + themeBgColor + "e6;\n"; // e6 adds 90% opacity
-  dynamicCSS += "--text-color: " + themeTextColor + ";\n";
-  dynamicCSS += "--walk-color: " + themeWalkColor + ";\n";
-  dynamicCSS += "--run-color: " + themeRunColor + ";\n";
-  dynamicCSS += "}\n";
-
-  if (!themeShowEmoji)
-    dynamicCSS +=
-        "#activity-metric, #activity-divider { display: none !important; }\n";
-
-  dynamicCSS += ".status-icon { ";
-  if (themeGreyscale)
-    dynamicCSS += "filter: grayscale(100%); ";
-  dynamicCSS += "}\n";
-
-  String walkFilter = themeGreyscale ? "grayscale(0%) " : "";
-  String runFilter = themeGreyscale ? "grayscale(0%) " : "";
-
-  if (themeGlow) {
-    walkFilter += "drop-shadow(0 0 0.5rem var(--walk-color))";
-    runFilter += "drop-shadow(0 0 0.5rem var(--run-color))";
-  } else if (!themeGreyscale) {
-    walkFilter = "none";
-    runFilter = "none";
-  }
-
-  dynamicCSS += ".status-icon.active-walk { filter: " + walkFilter + "; }\n";
-  dynamicCSS += ".status-icon.active-run { filter: " + runFilter + "; }\n";
-
-  html.replace("%DYNAMIC_CSS%", dynamicCSS);
-
-  server.send(200, "text/html", html);
+  server.send(200, "text/html", overlayHTML);
 }
 
-void handleThemeCSS() {
-  char css[896];
-  int len = 0;
-
-  len += snprintf(css + len, sizeof(css) - len,
-                  ":root {\n--bg-color: %se6;\n--text-color: %s;\n}\n\n",
-                  themeBgColor.c_str(), themeTextColor.c_str());
-
-  len += snprintf(css + len, sizeof(css) - len,
-                  ".status-icon { display: flex; align-items: center; "
-                  "justify-content: center; width: 60px; height: 60px; "
-                  "font-size: 48px; line-height: 1; opacity: 0.3; transition: "
-                  "all 0.3s ease; flex-shrink: 0; transform: translateZ(0); "
-                  "will-change: filter; "
-                  "%s}\n",
-                  themeGreyscale ? "filter: grayscale(100%);" : "");
-
-  const char *walkGS = themeGreyscale ? "grayscale(0%) " : "";
-  const char *runGS = themeGreyscale ? "grayscale(0%) " : "";
-  const char *noFx = (!themeGreyscale && !themeGlow) ? "none" : "";
-
-  if (themeGlow) {
-    len += snprintf(css + len, sizeof(css) - len,
-                    ".status-icon.active-walk { opacity: 1; filter: "
-                    "%sdrop-shadow(0 0 6px %s); }\n",
-                    walkGS, themeWalkColor.c_str());
-    len += snprintf(css + len, sizeof(css) - len,
-                    ".status-icon.active-run { opacity: 1; filter: "
-                    "%sdrop-shadow(0 0 6px %s); }\n",
-                    runGS, themeRunColor.c_str());
-  } else {
-    len += snprintf(css + len, sizeof(css) - len,
-                    ".status-icon.active-walk { opacity: 1; filter: %s%s; }\n",
-                    walkGS, noFx);
-    len += snprintf(css + len, sizeof(css) - len,
-                    ".status-icon.active-run { opacity: 1; filter: %s%s; }\n",
-                    runGS, noFx);
-  }
-
-  snprintf(css + len, sizeof(css) - len,
-           ".emote { width: 100%%; height: 100%%; object-fit: contain; "
-           "transform: translateZ(0); display: block; }\n");
-
-  server.send(200, "text/css", css);
-}
-
-bool isValidHexColor(const String &s) {
-  if (s.length() != 7 || s[0] != '#')
-    return false;
-  for (int i = 1; i < 7; i++) {
-    char c = s[i];
-    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-          (c >= 'A' && c <= 'F')))
-      return false;
-  }
-  return true;
-}
-
-void handleSaveTheme() {
-  if (server.hasArg("overlayMode")) {
-    overlayMode = server.arg("overlayMode").toInt();
-    prefs.putInt("mode", overlayMode);
-  }
-  if (server.hasArg("simpleFont")) {
-    simpleFont = server.arg("simpleFont");
-    prefs.putString("sfont", simpleFont);
-  }
-  if (server.hasArg("simpleColor")) {
-    String v = server.arg("simpleColor");
-    if (isValidHexColor(v)) {
-      simpleColor = v;
-      prefs.putString("scolor", simpleColor);
-    }
-  }
-
-  if (server.hasArg("bgColor")) {
-    String v = server.arg("bgColor");
-    if (isValidHexColor(v)) {
-      themeBgColor = v;
-      prefs.putString("bg", themeBgColor);
-    }
-  }
-  if (server.hasArg("textColor")) {
-    String v = server.arg("textColor");
-    if (isValidHexColor(v)) {
-      themeTextColor = v;
-      prefs.putString("text", themeTextColor);
-    }
-  }
-  if (server.hasArg("walkColor")) {
-    String v = server.arg("walkColor");
-    if (isValidHexColor(v)) {
-      themeWalkColor = v;
-      prefs.putString("walk", themeWalkColor);
-    }
-  }
-  if (server.hasArg("runColor")) {
-    String v = server.arg("runColor");
-    if (isValidHexColor(v)) {
-      themeRunColor = v;
-      prefs.putString("run", themeRunColor);
-    }
-  }
-
-  // Constrain input to 2048 chars to allow long URLs/Data URIs
-  // while preventing NVS storage overflows (NVS max is ~4000 bytes)
-  if (server.hasArg("iconStill")) {
-    iconStill = server.arg("iconStill").substring(0, 2048);
-    prefs.putString("istill", iconStill);
-  }
-  if (server.hasArg("iconWalk")) {
-    iconWalk = server.arg("iconWalk").substring(0, 2048);
-    prefs.putString("iwalk", iconWalk);
-  }
-  if (server.hasArg("iconRun")) {
-    iconRun = server.arg("iconRun").substring(0, 2048);
-    prefs.putString("irun", iconRun);
-  }
-
-  themeGlow = server.hasArg("glow");
-  prefs.putBool("glow", themeGlow);
-
-  themeGreyscale = server.hasArg("grey");
-  prefs.putBool("grey", themeGreyscale);
-
-  themeShowEmoji = server.hasArg("emoji");
-  prefs.putBool("emoji", themeShowEmoji);
-
+void handleSaveConfig() {
   if (server.hasArg("powerMode")) {
-    powerMode = server.arg("powerMode").toInt();
+    powerMode = constrain(server.arg("powerMode").toInt(), 0, 2);
     prefs.putInt("power", powerMode);
   }
-
-  // Broadcast reload command to OBS before redirecting the config page
-  webSocket.broadcastTXT("{\"command\":\"reload\"}");
-
   server.sendHeader("Location", "/?saved=1");
   server.send(200, "text/plain", "OK");
 }
@@ -434,17 +215,6 @@ void drawResetCountdown(int seconds) {
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
 }
 
-// Fallback logic for empty string values
-String getIconStr(int state) {
-  if (state == 0)
-    return (iconStill.length() > 0) ? iconStill : "🧍";
-  if (state == 1)
-    return (iconWalk.length() > 0) ? iconWalk : "🚶";
-  if (state == 2)
-    return (iconRun.length() > 0) ? iconRun : "🏃";
-  return "🧍";
-}
-
 bool connectToWifi(const char *ssid, const char *password) {
   WiFi.begin(ssid, password);
   unsigned long start = millis();
@@ -457,32 +227,12 @@ bool connectToWifi(const char *ssid, const char *password) {
 // --- MAIN FIRMWARE ---
 
 void loadPreferences() {
-  overlayMode = prefs.getInt("mode", 1);
-  simpleFont = prefs.getString("sfont", "Inter");
-  simpleColor = prefs.getString("scolor", "#ffffff");
-
-  themeBgColor = prefs.getString("bg", "#0f0f14");
-  themeTextColor = prefs.getString("text", "#ffffff");
-  themeWalkColor = prefs.getString("walk", "#00ffcc");
-  themeRunColor = prefs.getString("run", "#ff4444");
-
-  iconStill = prefs.getString("istill", "");
-  iconWalk = prefs.getString("iwalk", "");
-  iconRun = prefs.getString("irun", "");
-
-  themeGlow = prefs.getBool("glow", true);
-  themeGreyscale = prefs.getBool("grey", true);
-  themeShowEmoji = prefs.getBool("emoji", true);
   powerMode = prefs.getInt("power", 1);
 }
 
 void handleResetConfig() {
   prefs.clear();
-
   loadPreferences();
-
-  webSocket.broadcastTXT("{\"command\":\"reload\"}");
-
   server.send(200, "text/plain", "OK");
 }
 
@@ -573,8 +323,7 @@ void setup() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/overlay", HTTP_GET, handleOverlay);
-  server.on("/theme.css", HTTP_GET, handleThemeCSS);
-  server.on("/savetheme", HTTP_POST, handleSaveTheme);
+  server.on("/saveconfig", HTTP_POST, handleSaveConfig);
   server.on("/reset", HTTP_POST, handleReset);
   server.on("/resetconfig", HTTP_POST, handleResetConfig);
   server.on("/api/config", HTTP_GET, handleApiConfig);
@@ -727,11 +476,10 @@ void loop() {
   if (hwStepCount >= stepOffset)
     displaySteps = hwStepCount - stepOffset;
 
-  activityString = getIconStr(currentActivity);
-
+  static unsigned long lastWsBroadcastMs = 0;
   static int batchThreshold = random(8, 15);
-  if (displaySteps != lastBroadcastSteps || currentActivity != lastActivity) {
 
+  if (displaySteps != lastBroadcastSteps || currentActivity != lastActivity) {
     // Only broadcast if the state changed, OR if we hit our jitter threshold
     if (currentActivity != lastActivity ||
         abs((int)(displaySteps - lastBroadcastSteps)) >= batchThreshold) {
@@ -741,9 +489,16 @@ void loop() {
 
       lastBroadcastSteps = displaySteps;
       lastActivity = currentActivity;
+      lastWsBroadcastMs = millis();
 
       batchThreshold = random(8, 15);
     }
+  }
+
+  // Lazy heartbeat: keep NAT tables alive when standing still
+  if (millis() - lastWsBroadcastMs >= 37000) {
+    webSocket.broadcastTXT("{\"type\":\"ping\"}");
+    lastWsBroadcastMs = millis();
   }
 
   if (resetState != ResetState::IDLE)

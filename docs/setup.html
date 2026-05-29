@@ -179,6 +179,7 @@
     <div class="nav-links">
       <a href="./index.html">Home</a>
       <a href="./setup.html" class="active">Get Started</a>
+      <a href="./gallery/">Overlays</a>
       <a href="./technical.html">Technical</a>
     </div>
   </nav>
@@ -276,54 +277,52 @@
       </div>
     </div>
 
-    <!-- ── Step 4: OBS ── -->
+    <!-- ── Step 4: Gallery + OBS ── -->
     <div class="widget">
       <div class="widget-title">
         <div class="step-num">4</div>
-        <h2>Add to OBS</h2>
+        <h2>Get your overlay &amp; add to OBS</h2>
       </div>
-      <p>Once connected, the device's IP address appears on its screen. Use it to add the overlay to your stream.</p>
+      <p>Browse the <a href="./gallery/">Overlay Gallery</a>, pick a theme, customise it to match your stream, then download it as a single file and point OBS at it.</p>
 
       <ol class="obs-steps">
         <li>
           <span class="check">›</span>
-          <span>On your PC, open <code>http://stepstick.local</code> in a browser (or type the IP address shown on the
-            device screen). This is the StepStick settings page.</span>
+          <span>Open the <a href="./gallery/">Gallery</a>, choose a theme, and tweak colours, icons, and effects in the config panel on the right.</span>
         </li>
         <li>
           <span class="check">›</span>
-          <span>Copy the <strong>OBS Integration URL</strong> shown at the top of that page.</span>
+          <span>Click <strong>Download Overlay</strong> and save the <code>.html</code> file somewhere easy to find.</span>
         </li>
         <li>
           <span class="check">›</span>
-          <span>In OBS, click <strong>+ → Browser Source</strong>, paste the URL, and delete anything in the Custom CSS
-            field so the background is transparent.</span>
+          <span>In OBS, click <strong>+ → Browser Source</strong>. Check <strong>Local file</strong>, then browse to the downloaded file.</span>
         </li>
         <li>
           <span class="check">›</span>
           <div>
-            <span>Set the <strong>Width</strong> and <strong>Height</strong> for your overlay mode:</span>
+            <span>Set the <strong>Width</strong> and <strong>Height</strong> to match your chosen theme:</span>
             <table style="margin-top:10px; margin-bottom:10px; width:auto; font-size:0.88rem;">
               <thead>
                 <tr>
-                  <th>Mode</th>
+                  <th>Theme</th>
                   <th>Width</th>
                   <th>Height</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Simple (counter only)</td>
+                  <td>Simple Counter</td>
                   <td>200</td>
                   <td>100</td>
                 </tr>
                 <tr>
-                  <td>Standard (HUD pill)</td>
+                  <td>Standard HUD</td>
                   <td>400</td>
                   <td>150</td>
                 </tr>
                 <tr>
-                  <td>Advanced (HUD + chart)</td>
+                  <td>Advanced HUD</td>
                   <td>450</td>
                   <td>300</td>
                 </tr>
@@ -336,10 +335,15 @@
         </li>
         <li>
           <span class="check">›</span>
-          <span>Colours, icons, and effects can all be changed on the settings page — the overlay updates automatically
-            when you save.</span>
+          <span>Leave the <strong>Custom CSS</strong> field empty — the overlay already has a transparent background and will auto-connect to your device at <code>stepstick.local</code>.</span>
         </li>
       </ol>
+
+      <div class="callout tip" style="margin-top:20px;">
+        <span class="callout-icon">💡</span>
+        <span>Want to tweak the colours later? Open the <a href="./gallery/">Gallery</a>, click <strong>Import Saved Overlay</strong>, load your file, adjust the settings, and re-download.</span>
+      </div>
+
       <div style="margin-top:20px;">
         <img src="./images/Screenshot_20260525_191421.png" alt="StepStick overlay live inside OBS"
           style="width:100%; max-width:560px; border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,0.5);">

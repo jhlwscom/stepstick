@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+
+  <script id="stepstick-meta" type="application/json">
+  {"name":"Simple Counter","description":"Just the number — font & colour","author":"jhlws","authorUrl":"https://github.com/jhlwscom"}
+  </script>
+
+  <script id="stepstick-schema" type="application/json">
+  [
+    {"key":"color",      "label":"Text Color",  "type":"color",    "default":"#ffffff"},
+    {"key":"fontFamily", "label":"Font", "type":"font", "default":"Inter"},
+    {"key":"shadow",     "label":"Text Shadow", "type":"checkbox", "default":true}
+  ]
+  </script>
+
+  <script id="stepstick-config" type="application/json">{}</script>
+
+  <!-- Google Fonts: updated dynamically when fontFamily config changes -->
+  <link id="gfont" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap">
+
+  <script src="https://jhlwscom.github.io/stepstick/stepstick.js"></script>
+
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #counter {
+      font-size: 8vw;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      font-family: 'Inter', sans-serif;
+      color: #ffffff;
+      text-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5);
+      transition: color 0.3s, text-shadow 0.3s;
+    }
+
+    body.is-disconnected #counter { opacity: 0.4; transition: opacity 1s ease; }
+    body.is-connected    #counter { opacity: 1;   transition: opacity 0.3s ease; }
+  </style>
+</head>
+<body>
+  <div id="counter">—</div>
+
+  <script>
+    function bool(v, def) {
+      if (v === undefined || v === null) return def !== undefined ? def : true;
+      if (typeof v === 'boolean') return v;
+      return v !== 'false' && v !== '0' && v !== '';
+    }
+
+    var overlay = new StepStick();
+    var gfont   = document.getElementById('gfont');
+    var counter = document.getElementById('counter');
+    var lastFont = '';
+
+    function applyConfig() {
+      var color  = overlay.config('color')      || '#ffffff';
+      var font   = (overlay.config('fontFamily') || 'Inter').trim();
+      var shadow = bool(overlay.config('shadow'), true);
+
+      counter.style.color      = color;
+      counter.style.textShadow = shadow ? '0.1em 0.1em 0.2em rgba(0,0,0,0.5)' : 'none';
+
+      if (font !== lastFont) {
+        lastFont = font;
+        counter.style.fontFamily = "'" + font + "', sans-serif";
+        gfont.href = 'https://fonts.googleapis.com/css2?family=' +
+                     encodeURIComponent(font) + ':wght@400;700;800&display=swap';
+      }
+    }
+
+    applyConfig();
+    overlay.on('config', applyConfig);
+
+    overlay.on('telemetry', function (data) {
+      if (data.steps !== undefined) {
+        counter.textContent = data.steps;
+      }
+    });
+  </script>
+</body>
+</html>

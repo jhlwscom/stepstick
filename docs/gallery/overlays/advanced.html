@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link id="gfont" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+
+  <script id="stepstick-meta" type="application/json">
+  {"name":"Advanced HUD","description":"Standard HUD + steps/min chart","author":"jhlws","authorUrl":"https://github.com/jhlwscom"}
+  </script>
+
+  <script id="stepstick-schema" type="application/json">
+  [
+    {"key":"bgColor",   "label":"Background",          "type":"color",    "default":"#0f0f14"},
+    {"key":"textColor", "label":"Text Color",           "type":"color",    "default":"#ffffff"},
+    {"key":"walkColor", "label":"Walk Glow",            "type":"color",    "default":"#00ffcc"},
+    {"key":"runColor",  "label":"Run Glow",             "type":"color",    "default":"#ff4444"},
+    {"key":"glow",      "label":"Active Glow Effect",   "type":"checkbox", "default":true},
+    {"key":"greyscale", "label":"Greyscale Icons",      "type":"checkbox", "default":true},
+    {"key":"fontFamily", "label":"Font",                      "type":"font", "default":"Inter"},
+    {"key":"iconStill", "label":"Still Icon", "type":"icon", "default":""},
+    {"key":"iconWalk",  "label":"Walk Icon",  "type":"icon", "default":""},
+    {"key":"iconRun",   "label":"Run Icon",   "type":"icon", "default":""}
+  ]
+  </script>
+
+  <script id="stepstick-config" type="application/json">{}</script>
+
+  <script src="https://jhlwscom.github.io/stepstick/stepstick.js"></script>
+
+  <style>
+    html { font-size: 4vw; width: 100%; height: 100%; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .widget {
+      display: inline-flex;
+      flex-direction: column;
+      background: #0f0f14e6; /* fallback; overridden by applyConfig() */
+      border-radius: 1rem;
+      box-shadow: 0 0.5rem 2rem rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    /* ── HUD row ── */
+    .hud {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 1.5rem;
+      gap: 1.5rem;
+    }
+
+    .metric { display: flex; align-items: center; gap: 0.75rem; }
+
+    .step-value {
+      font-size: 2.625rem;
+      font-weight: 800;
+      letter-spacing: -0.0625rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      min-width: 5ch;
+      text-align: right;
+    }
+
+    .step-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.0625rem;
+      opacity: 0.6;
+    }
+
+    .divider {
+      width: 0.125rem;
+      height: 2.5rem;
+      opacity: 0.1;
+      border-radius: 0.125rem;
+    }
+
+    .activity-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.75rem;
+      height: 3.75rem;
+      font-size: 3rem;
+      line-height: 1;
+      opacity: 0.3;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+      transform: translateZ(0);
+      will-change: filter;
+      flex-shrink: 0;
+    }
+
+    .activity-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transform: translateZ(0);
+      display: block;
+    }
+
+    .activity-icon.active { opacity: 1; }
+
+    .battery-warn {
+      display: none;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 800;
+      color: #ff4444;
+      background: rgba(255,68,68,0.15);
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    .battery-warn.visible { display: flex; }
+
+    /* ── Chart panel ── */
+    .chart-panel {
+      padding: 0 1.5rem 1.25rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-weight: 700;
+      opacity: 0.7;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    canvas {
+      background: rgba(0,0,0,0.2);
+      border-radius: 0.25rem;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 11/3;
+      display: block;
+    }
+
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+    body.is-disconnected .widget { opacity: 0.4; transition: opacity 1s ease; }
+    body.is-connected    .widget { opacity: 1;   transition: opacity 0.3s ease; }
+  </style>
+
+  <style id="dyn"></style>
+</head>
+<body>
+  <div class="widget" id="widget">
+
+    <div class="hud">
+      <div class="metric">
+        <div class="step-value" id="steps">—</div>
+        <div class="step-label" id="step-label">Steps</div>
+      </div>
+      <div class="divider" id="divider"></div>
+      <div class="metric">
+        <div class="activity-icon" id="activity">🧍</div>
+      </div>
+      <div class="battery-warn" id="battery-warn">🪫</div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="stats-row">
+        <span>Activity Rate (last 2 min)</span>
+        <span id="spm">0 SPM</span>
+      </div>
+      <!-- 440×120 internal resolution for crisp rendering at any CSS size -->
+      <canvas id="chart" width="440" height="120"></canvas>
+    </div>
+
+  </div>
+
+  <script>
+    function bool(v, def) {
+      if (v === undefined || v === null) return def !== undefined ? def : true;
+      if (typeof v === 'boolean') return v;
+      return v !== 'false' && v !== '0' && v !== '';
+    }
+
+    var overlay  = new StepStick();
+    var lastFont = '';
+
+    // ── Config application ─────────────────────────────────────────────────
+    function applyConfig() {
+      var bg   = overlay.config('bgColor')    || '#0f0f14';
+      var text = overlay.config('textColor')  || '#ffffff';
+      var walk = overlay.config('walkColor')  || '#00ffcc';
+      var run  = overlay.config('runColor')   || '#ff4444';
+      var font = overlay.config('fontFamily') || 'Inter';
+      var glow = bool(overlay.config('glow'),      true);
+      var grey = bool(overlay.config('greyscale'), true);
+
+      var w = document.getElementById('widget');
+      w.style.background = bg + 'e6';
+      w.style.color      = text;
+      w.style.fontFamily = "'" + font + "', sans-serif";
+
+      if (font !== lastFont) {
+        lastFont = font;
+        document.getElementById('gfont').href =
+          'https://fonts.googleapis.com/css2?family=' +
+          encodeURIComponent(font) + ':wght@400;600;700;800&display=swap';
+      }
+
+      document.getElementById('divider').style.background = text;
+      document.getElementById('step-label').style.color   = text;
+
+      var stillFilter = grey ? 'grayscale(100%)' : 'none';
+      var greyPrefix  = grey ? 'grayscale(0%) ' : '';
+      var walkFilter  = glow ? greyPrefix + 'drop-shadow(0 0 0.5rem ' + walk + ')' : (grey ? 'grayscale(0%)' : 'none');
+      var runFilter   = glow ? greyPrefix + 'drop-shadow(0 0 0.5rem ' + run  + ')' : (grey ? 'grayscale(0%)' : 'none');
+
+      document.getElementById('dyn').textContent =
+        '.activity-icon             { filter: ' + stillFilter + '; }\n' +
+        '.activity-icon.active-walk { filter: ' + walkFilter  + '; }\n' +
+        '.activity-icon.active-run  { filter: ' + runFilter   + '; }\n';
+    }
+
+    applyConfig();
+
+    // ── Chart ─────────────────────────────────────────────────────────────
+    var canvas   = document.getElementById('chart');
+    var ctx      = canvas.getContext('2d');
+    var chartData      = new Array(24).fill(0); // 24 × 5 s = 2 min history
+    var totalSteps     = 0;
+    var lastTickSteps  = 0;
+
+    function drawChart() {
+      var delta = totalSteps - lastTickSteps;
+      lastTickSteps = totalSteps;
+      chartData.shift();
+      chartData.push(delta);
+
+      var recent = chartData.slice(-12).reduce(function(a, b) { return a + b; }, 0);
+      document.getElementById('spm').textContent = recent + ' SPM';
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      var maxVal = Math.max.apply(null, chartData.concat([10]));
+
+      var textColor = overlay.config('textColor') || '#ffffff';
+      ctx.beginPath();
+      ctx.strokeStyle = textColor;
+      ctx.lineWidth   = 4;
+
+      var xStep = canvas.width / (chartData.length - 1);
+      for (var i = 0; i < chartData.length; i++) {
+        var x = i * xStep;
+        var y = canvas.height - (chartData[i] / maxVal) * canvas.height;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.lineTo(canvas.width, canvas.height);
+      ctx.lineTo(0, canvas.height);
+      ctx.fillStyle = textColor + '22';
+      ctx.fill();
+    }
+
+    setInterval(drawChart, 5000);
+
+    // ── Icon helpers ──────────────────────────────────────────────────────
+    var ICON_KEYS     = ['iconStill', 'iconWalk', 'iconRun'];
+    var ICON_DEFAULTS = ['🧍', '🚶', '🏃'];
+
+    function resolveIcon(state) {
+      var custom = (overlay.config(ICON_KEYS[state]) || '').trim();
+      return custom || ICON_DEFAULTS[state] || ICON_DEFAULTS[0];
+    }
+
+    function renderIcon(el, state) {
+      var icon = resolveIcon(state);
+      if (icon.startsWith('http')) {
+        el.innerHTML = '<img src="' + icon + '" alt="">';
+      } else {
+        el.textContent = icon;
+      }
+    }
+
+    var lastState = 0;
+
+    overlay.on('config', function () {
+      renderIcon(document.getElementById('activity'), lastState);
+      applyConfig();
+    });
+
+    // ── Telemetry ─────────────────────────────────────────────────────────
+    overlay.on('telemetry', function (data) {
+      if (data.steps !== undefined) {
+        document.getElementById('steps').textContent = data.steps;
+        if (totalSteps === 0 && lastTickSteps === 0) lastTickSteps = data.steps;
+        totalSteps = data.steps;
+      }
+
+      if (data.state !== undefined) {
+        lastState = data.state;
+        var el = document.getElementById('activity');
+        el.className = 'activity-icon';
+        if (data.state === 1)      { el.classList.add('active', 'active-walk'); }
+        else if (data.state === 2) { el.classList.add('active', 'active-run'); }
+        renderIcon(el, data.state);
+      }
+
+      if (data.battery !== undefined) {
+        document.getElementById('battery-warn').classList.toggle('visible', data.battery <= 15);
+      }
+    });
+  </script>
+</body>
+</html>

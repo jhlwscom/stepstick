@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<!--
+  StepStick Overlay — starter template
+  ════════════════════════════════════
+  A fully-working overlay you can edit, preview, and use as a Browser Source
+  in OBS / Streamlabs.  Every section below has comments explaining what it does
+  and how to change it.
+
+  QUICK START
+  ───────────
+  1. Edit the code in the gallery editor and watch the preview update live.
+  2. Use the Configure tab to test your config fields interactively.
+  3. Click "Download Overlay" and add it as a Browser Source in OBS.
+     Recommended starting size: 400 × 150 px.
+
+  FILE STRUCTURE
+  ──────────────
+  ① stepstick-meta   — name / description / author shown in the gallery
+  ② stepstick-schema — config fields the gallery turns into a live form
+  ③ stepstick-config — baked config values (filled automatically on download)
+  ④ <style>          — your overlay's visual design
+  ⑤ <body>           — your overlay's HTML elements
+  ⑥ <script>         — your overlay's logic (connects to the device via the SDK)
+-->
+<html>
+<head>
+  <meta charset="UTF-8">
+
+  <!--
+    ① GOOGLE FONTS ─────────────────────────────────────────────────────────
+    Replace "Inter" with any Google Font name you like.
+    The id="gfont" attribute lets the gallery's font picker swap this link
+    in real-time — keep that id if you want the font field type to work.
+    Remove this block entirely if you prefer a system font.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link id="gfont" rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+
+  <!--
+    ② META BLOCK ──────────────────────────────────────────────────────────
+    Displayed in the gallery sidebar and author credit strip.
+    Update all four values to describe your overlay.
+  -->
+  <script id="stepstick-meta" type="application/json">
+  {
+    "name":        "My Overlay",
+    "description": "A short description shown in the gallery",
+    "author":      "yourname",
+    "authorUrl":   "https://github.com/yourhandle"
+  }
+  </script>
+
+  <!--
+    ③ SCHEMA BLOCK ────────────────────────────────────────────────────────
+    Defines the config fields shown in the gallery's Configure panel (and
+    in the Configure tab when editing here).  The gallery builds a live form
+    from this JSON and delivers changes to your overlay via postMessage —
+    no page reload needed.
+
+    SUPPORTED FIELD TYPES
+    ─────────────────────
+    "color"    — colour picker  → value is a CSS colour string e.g. "#00ffcc"
+    "checkbox" — toggle switch  → value is true or false
+    "font"     — font picker    → value is a Google Font family name e.g. "Orbitron"
+    "text"     — free text box  → value is any string
+    "icon"     — text box + 7TV emote picker button
+                 → value is an emoji e.g. "🏃" OR an https:// image URL
+
+    REQUIRED PROPERTIES ON EACH FIELD
+    ──────────────────────────────────
+    "key"     — identifier; read in JS with overlay.config("key")
+    "label"   — human-readable label shown next to the input
+    "type"    — one of the types above
+    "default" — value used before the user changes anything
+
+    TO ADD A FIELD   — copy any object below, change key/label/type/default
+    TO REMOVE A FIELD — delete the whole object (and the trailing comma if needed)
+
+    TIP: after editing this block, switch to the Configure tab to see the
+    generated form and test your new fields live.
+  -->
+  <script id="stepstick-schema" type="application/json">
+  [
+    { "key": "bgColor",      "label": "Background",         "type": "color",    "default": "#0f0f14" },
+    { "key": "textColor",    "label": "Text Color",          "type": "color",    "default": "#ffffff" },
+    { "key": "accentColor",  "label": "Accent / Glow",       "type": "color",    "default": "#00ffcc" },
+    { "key": "showActivity", "label": "Show Activity Icon",  "type": "checkbox", "default": true },
+    { "key": "fontFamily",   "label": "Font",                "type": "font",     "default": "Inter" },
+    { "key": "iconStill",    "label": "Still Icon",          "type": "icon",     "default": "" },
+    { "key": "iconWalk",     "label": "Walk Icon",           "type": "icon",     "default": "" },
+    { "key": "iconRun",      "label": "Run Icon",            "type": "icon",     "default": "" }
+  ]
+  </script>
+
+  <!--
+    ④ CONFIG BLOCK ────────────────────────────────────────────────────────
+    When a user downloads this overlay, the gallery injects their chosen
+    config values here as JSON.  Leave this exactly as-is.
+  -->
+  <script id="stepstick-config" type="application/json">{}</script>
+
+  <!--
+    ⑤ STEPSTICK SDK ───────────────────────────────────────────────────────
+    Must appear before your own <script> block.  Provides the StepStick class
+    that connects to your device over WebSocket and fires telemetry events.
+    Do not change this URL.
+  -->
+  <script src="https://jhlwscom.github.io/stepstick/stepstick.js"></script>
+
+  <style>
+    /*
+      RESPONSIVE SIZING
+      ─────────────────
+      Setting font-size on <html> as a vw value makes everything you size in
+      rem / em scale automatically with the Browser Source dimensions in OBS.
+
+      Rule of thumb: font-size: Xvw means 1rem = X% of the source width.
+      At 4vw on a 400 px-wide source → 1rem = 16 px.
+      Halve the source width and all rem-based sizes halve too — no breakpoints.
+
+      Adjust the coefficient until the overlay looks right at your target size.
+    */
+    html { font-size: 4vw; width: 100%; height: 100%; }
+
+    /*
+      BODY
+      ────
+      background: transparent is required — OBS composites your overlay on
+      top of the game capture.  Any non-transparent background blocks the scene.
+
+      The flex layout centres the widget inside the Browser Source rectangle.
+    */
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /*
+      WIDGET CONTAINER
+      ────────────────
+      The coloured pill that wraps your data.  background and color are both
+      overridden at runtime by applyConfig() so the gallery colour pickers
+      work live without a reload.
+
+      The `e6` hex suffix appended to background colours = ~90% opacity,
+      making the widget readable while letting a hint of the scene show through.
+      Change to `ff` for fully opaque or `99` for ~60% opacity.
+    */
+    .widget {
+      display: inline-flex;
+      flex-direction: row;
+      align-items: center;
+      background: #0f0f14e6;      /* fallback — applyConfig() overrides this */
+      border-radius: 1rem;
+      box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+      padding: 0.75rem 1.5rem;
+      gap: 1.5rem;
+    }
+
+    /*
+      STEP COUNT
+      ──────────
+      font-variant-numeric: tabular-nums keeps all digit characters the same
+      width so the counter doesn't shift layout as the number increases.
+      min-width: 5ch reserves space for five digits from the start so nothing
+      jumps when you go from 9,999 to 10,000.
+    */
+    .step-value {
+      font-size: 2.625rem;
+      font-weight: 800;
+      letter-spacing: -0.0625rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      min-width: 5ch;
+      text-align: right;
+    }
+
+    /* "STEPS" label beneath/beside the count */
+    .step-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.0625rem;
+      opacity: 0.6;
+    }
+
+    /* Thin vertical separator — background colour is set to textColor by applyConfig() */
+    .divider {
+      width: 0.125rem;
+      height: 2.5rem;
+      opacity: 0.1;
+      border-radius: 0.125rem;
+    }
+
+    /*
+      ACTIVITY ICON
+      ─────────────
+      Shows still / walking / running states via opacity + CSS filter.
+
+      Starts dim (opacity: 0.3) when the user is still.  The JS adds `.active`
+      when walking or running, which brings it to full opacity.  The walk/run
+      glow filter rules are written dynamically by applyConfig() into
+      <style id="dyn"> — see the comment on that element below.
+
+      transform: translateZ(0) and will-change: filter force a GPU compositing
+      layer, which prevents the drop-shadow filter transition from causing
+      layout jank on lower-end systems.
+    */
+    .activity-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.75rem;
+      height: 3.75rem;
+      font-size: 3rem;
+      line-height: 1;
+      opacity: 0.3;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+      transform: translateZ(0);
+      will-change: filter;
+      flex-shrink: 0;
+    }
+    /* When the icon value is an image URL, renderIcon() injects an <img> here */
+    .activity-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transform: translateZ(0);
+      display: block;
+    }
+    .activity-icon.active { opacity: 1; }
+
+    /*
+      BATTERY WARNING
+      ───────────────
+      Hidden (display: none) by default.  The JS toggles `.visible` when
+      battery ≤ 15%, revealing the pulsing warning badge.
+      Adjust the threshold in the telemetry handler below.
+    */
+    .battery-warn {
+      display: none;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 800;
+      color: #ff4444;
+      background: rgba(255, 68, 68, 0.15);
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    .battery-warn.visible { display: flex; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /*
+      DISCONNECTED STATE
+      ──────────────────
+      StepStick adds `is-disconnected` or `is-connected` to <body> as the
+      WebSocket connection changes.  Fading the widget makes drop-outs obvious
+      without needing a visible error message.
+    */
+    body.is-disconnected .widget { opacity: 0.4; transition: opacity 1s ease; }
+    body.is-connected    .widget { opacity: 1;   transition: opacity 0.3s ease; }
+
+    /*
+      DYNAMIC STYLE ELEMENT
+      ─────────────────────
+      applyConfig() writes CSS rules for the activity icon's glow effect into
+      this <style> element at runtime.  Replacing a whole CSS block is simpler
+      than juggling individual inline styles when the filter string is complex.
+      Leave this empty element here — do not remove it.
+    */
+  </style>
+  <style id="dyn"></style>
+</head>
+<body>
+
+  <!--
+    WIDGET HTML
+    ───────────
+    The IDs on #steps, #activity, and #battery-warn are read by the JS below —
+    keep them.  Everything else (class names, structure, extra elements) is
+    yours to change freely.
+  -->
+  <div class="widget" id="widget">
+
+    <!-- Step count -->
+    <div class="metric">
+      <div class="step-value" id="steps">—</div>
+      <div class="step-label" id="step-label">Steps</div>
+    </div>
+
+    <!-- Thin vertical separator (hidden when "Show Activity Icon" is off) -->
+    <div class="divider" id="divider"></div>
+
+    <!-- Activity icon area: still / walking / running -->
+    <div class="metric" id="activity-wrap">
+      <div class="activity-icon" id="activity">🧍</div>
+    </div>
+
+    <!-- Low-battery badge (visible at ≤ 15%) -->
+    <div class="battery-warn" id="battery-warn">🪫</div>
+
+  </div>
+
+  <script>
+    /*
+      BOOL HELPER
+      ───────────
+      overlay.config() always returns a string (or undefined).  This helper
+      coerces those values to real booleans so you can write:
+        bool(overlay.config('showActivity'), true)
+      instead of manually comparing strings like "false" or "0".
+    */
+    function bool(v, def) {
+      if (v === undefined || v === null) return def !== undefined ? def : true;
+      if (typeof v === 'boolean') return v;
+      return v !== 'false' && v !== '0' && v !== '';
+    }
+
+    /*
+      SDK INITIALISATION
+      ──────────────────
+      new StepStick() reads the stepstick-config block, connects to your device
+      over WebSocket, and sets up the event system.  Keep it at the top of
+      your script and assign it to `overlay`.
+    */
+    var overlay  = new StepStick();
+    var lastFont = '';   /* tracks last loaded font to skip redundant requests */
+
+    /*
+      applyConfig()
+      ─────────────
+      Reads all config values at once and applies them to the DOM.
+      Called once on load (picks up baked or default values) and again on
+      every 'config' event (gallery sends an update or saved file is imported).
+
+      Pattern: read everything up front, then apply — avoids calling
+      overlay.config() scattered through multiple handlers.
+    */
+    function applyConfig() {
+      var bg      = overlay.config('bgColor')      || '#0f0f14';
+      var text    = overlay.config('textColor')    || '#ffffff';
+      var accent  = overlay.config('accentColor')  || '#00ffcc';
+      var font    = overlay.config('fontFamily')   || 'Inter';
+      var showAct = bool(overlay.config('showActivity'), true);
+
+      var w = document.getElementById('widget');
+      w.style.background = bg + 'e6';   /* e6 ≈ 90% opacity */
+      w.style.color      = text;
+      w.style.fontFamily = "'" + font + "', sans-serif";
+
+      /*
+        Only update the Google Fonts link when the font name actually changes.
+        Touching the href on every config event would fire a new network request
+        and flash unstyled text each time any other setting changes.
+      */
+      if (font !== lastFont) {
+        lastFont = font;
+        document.getElementById('gfont').href =
+          'https://fonts.googleapis.com/css2?family=' +
+          encodeURIComponent(font) + ':wght@400;600;700;800&display=swap';
+      }
+
+      document.getElementById('divider').style.background    = text;
+      document.getElementById('step-label').style.color      = text;
+      document.getElementById('divider').style.display       = showAct ? '' : 'none';
+      document.getElementById('activity-wrap').style.display = showAct ? '' : 'none';
+
+      /*
+        Write filter CSS into #dyn for the activity-icon glow.
+        Three rules cover the three states: still (grayscale), walking, running.
+
+        TO CUSTOMISE: adjust the drop-shadow radius or colour.
+        TO USE SEPARATE WALK/RUN COLOURS: add "walkColor" and "runColor" fields
+        to the schema and read them separately here.
+      */
+      document.getElementById('dyn').textContent =
+        '.activity-icon             { filter: grayscale(100%); }\n' +
+        '.activity-icon.active-walk { filter: grayscale(0%) drop-shadow(0 0 0.5rem ' + accent + '); }\n' +
+        '.activity-icon.active-run  { filter: grayscale(0%) drop-shadow(0 0 0.75rem ' + accent + '); }\n';
+    }
+
+    applyConfig();   /* apply defaults immediately so the overlay looks right before any data arrives */
+
+    /*
+      ICON HELPERS
+      ────────────
+      Icon config values can be:
+        • an emoji character  e.g. "🚶"         → rendered as textContent
+        • an https:// image URL e.g. "https://…" → rendered as <img>
+
+      ICON_DEFAULTS — fallback icons used when the user hasn't set a custom one.
+      Indices match activity states: 0 = still, 1 = walking, 2 = running.
+    */
+    var ICON_KEYS     = ['iconStill', 'iconWalk', 'iconRun'];
+    var ICON_DEFAULTS = ['🧍', '🚶', '🏃'];
+
+    function resolveIcon(state) {
+      var custom = (overlay.config(ICON_KEYS[state]) || '').trim();
+      return custom || ICON_DEFAULTS[state];
+    }
+
+    function renderIcon(el, state) {
+      var icon = resolveIcon(state);
+      if (icon.startsWith('http')) {
+        el.innerHTML = '<img src="' + icon + '" alt="">';
+      } else {
+        el.textContent = icon;
+      }
+    }
+
+    var lastState = 0;
+
+    /*
+      CONFIG EVENT
+      ────────────
+      Fires when the gallery sends postMessage({ action: 'batch_update' }) —
+      i.e. whenever the user changes a setting in the Configure panel, or
+      imports a previously saved overlay file.
+
+      Re-run applyConfig() in full each time — it's cheap.
+    */
+    overlay.on('config', function () {
+      renderIcon(document.getElementById('activity'), lastState);
+      applyConfig();
+    });
+
+    /*
+      TELEMETRY EVENT
+      ───────────────
+      Fires each time the device sends a data packet over WebSocket.
+
+      AVAILABLE FIELDS on the data object:
+        data.steps   — cumulative step count since last device reboot (integer ≥ 0)
+        data.state   — activity state:  0 = still,  1 = walking,  2 = running
+        data.battery — battery percentage 0–100 (integer); may be absent initially
+
+      Not every packet includes every field — always guard with `!== undefined`.
+    */
+    overlay.on('telemetry', function (data) {
+
+      /* Update step counter */
+      if (data.steps !== undefined) {
+        document.getElementById('steps').textContent = data.steps;
+      }
+
+      /*
+        Update activity icon.
+        Pattern: clear all state classes first, then add the correct one.
+        The active-walk and active-run classes are targeted by the CSS in #dyn.
+      */
+      if (data.state !== undefined) {
+        lastState = data.state;
+        var el = document.getElementById('activity');
+        el.className = 'activity-icon';                          /* reset walk/run classes */
+        if      (data.state === 1) { el.classList.add('active', 'active-walk'); }
+        else if (data.state === 2) { el.classList.add('active', 'active-run');  }
+        renderIcon(el, data.state);
+      }
+
+      /*
+        Show battery warning when charge is at or below 15%.
+        Adjust the threshold (15) to taste.
+      */
+      if (data.battery !== undefined) {
+        document.getElementById('battery-warn').classList.toggle('visible', data.battery <= 15);
+      }
+
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StepStick Overlay Gallery</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦶</text></svg>">
+  <style>
+    :root {
+      --bg: #0d0d12;
+      --surface: #16161e;
+      --card: #1e1e2a;
+      --border: #2a2a38;
+      --accent: #00ffcc;
+      --danger: #ff4444;
+      --text: #ffffff;
+      --muted: #8888a0;
+      --radius: 10px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header / nav ── */
+    header {
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+
+    .nav-brand {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-links a.active {
+      color: var(--accent);
+    }
+
+    /* ── Main layout: sidebar | preview | config ── */
+    .layout {
+      display: grid;
+      /* sidebar and config panel shrink a little before breaking */
+      grid-template-columns: minmax(220px, 280px) 1fr minmax(220px, 260px);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Overlay list sidebar ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 0 16px 24px;
+      /* top padding lives on h2 so it can stick */
+      display: flex;
+      flex-direction: column;
+      scroll-behavior: smooth;
+    }
+
+    /* Themed scrollbar — matches dark background */
+    .sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
+
+    .sidebar h2 {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--bg);
+      /* bleed to sidebar edges so scrolling cards hide behind it */
+      margin: 0 -16px;
+      padding: 20px 18px 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .overlay-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .overlay-card:hover {
+      border-color: #444;
+      background: #232332;
+    }
+
+    .overlay-card.active {
+      border-color: var(--accent);
+      background: rgba(0, 255, 204, 0.05);
+    }
+
+    #overlay-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 4px;
+    }
+
+    .overlay-card .name {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .overlay-card .desc {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .overlay-card .author {
+      font-size: 0.72rem;
+      color: var(--accent);
+      margin-top: 5px;
+      opacity: 0.8;
+    }
+
+    .overlay-card .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      font-size: 0.68rem;
+      color: var(--muted);
+      opacity: 0.7;
+    }
+
+    .overlay-card .ai-badge svg {
+      flex-shrink: 0;
+    }
+
+    #overlay-credit {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: none;
+    }
+
+    #overlay-credit a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    #overlay-credit a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Preview panel ── */
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .preview-area {
+      flex: 1;
+      background: repeating-conic-gradient(#1a1a24 0% 25%, #131320 0% 50%) 0 0 / 24px 24px;
+      overflow: auto;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      min-height: 0;
+      position: relative;
+    }
+
+    .preview-area iframe {
+      border: none;
+      display: block;
+      flex-shrink: 0;
+      /* default fill mode: override by applySize() */
+      width: 100%;
+      height: 100%;
+    }
+
+    /* fixed-size mode: centre the iframe; transform: scale() keeps it in view */
+    .preview-area.sized {
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .preview-area.sized iframe {
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .preview-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    /* ── Remote controls ── */
+    .remote-controls {
+      border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--surface);
+    }
+
+    .remote-controls .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .remote-controls label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 90px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .ctrl-val {
+      font-size: 0.78rem;
+      color: var(--text);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .ctrl-num {
+      width: 54px;
+      padding: 3px 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 5px;
+      font-size: 0.78rem;
+      outline: none;
+      text-align: center;
+    }
+
+    .ctrl-num:focus {
+      border-color: var(--accent);
+    }
+
+    .ctrl-num::placeholder {
+      color: var(--muted);
+    }
+
+    .ctrl-sep {
+      color: var(--border);
+      font-size: 0.85rem;
+      user-select: none;
+    }
+
+    .size-presets {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 5px;
+      font-size: 0.75rem;
+      padding: 3px 20px 3px 6px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .size-presets:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-sm {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      transition: 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-sm:hover {
+      background: #2a2a38;
+    }
+
+    .btn-sm.danger {
+      color: var(--danger);
+      border-color: rgba(255, 68, 68, 0.3);
+    }
+
+    .btn-sm.danger:hover {
+      background: rgba(255, 68, 68, 0.1);
+    }
+
+    .btn-sm.accent {
+      background: var(--accent);
+      color: #000;
+      border-color: transparent;
+    }
+
+    .btn-sm.accent:hover {
+      background: #00e6b8;
+    }
+
+    /* ── Config panel ── */
+    .config-panel {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .config-panel .panel-head {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .config-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    .form-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .form-row:last-child {
+      border-bottom: none;
+    }
+
+    .form-row label {
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .config-scroll select {
+      width: 100%;
+      padding: 5px 28px 5px 8px;
+      background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238888a0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .config-scroll select:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+      background: none;
+      flex-shrink: 0;
+      transition: border-color 0.15s;
+    }
+
+    input[type="color"]:hover {
+      border-color: var(--accent);
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+
+    /* Toggle switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      transition: 0.25s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: 0.25s;
+    }
+
+    input:checked+.slider {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    input:checked+.slider::before {
+      transform: translateX(16px);
+      background: #000;
+    }
+
+    /* Panel actions */
+    .panel-actions {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-full {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s;
+      border: 1px solid var(--border);
+    }
+
+    .btn-download {
+      background: var(--accent);
+      color: #000;
+      border-color: transparent;
+    }
+
+    .btn-download:hover {
+      background: #00e6b8;
+    }
+
+    .btn-import {
+      background: var(--card);
+      color: var(--text);
+    }
+
+    .btn-import:hover {
+      background: #2a2a38;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .no-overlay {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 24px;
+      text-align: center;
+    }
+
+    /* ── Medium: drop config panel below preview, sidebar stays left ── */
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: minmax(200px, 260px) 1fr;
+        grid-template-rows: 1fr auto;
+      }
+
+      .config-panel {
+        grid-column: 1 / -1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 280px;
+        flex-direction: row;
+        /* head | scroll | actions side by side */
+      }
+
+      .config-panel .panel-head {
+        writing-mode: vertical-lr;
+        transform: rotate(180deg);
+        border-bottom: none;
+        border-right: 1px solid var(--border);
+        padding: 16px 10px;
+        font-size: 0.65rem;
+      }
+
+      #overlay-credit {
+        writing-mode: vertical-lr;
+        transform: rotate(180deg);
+        border-bottom: none;
+        border-right: 1px solid var(--border);
+        padding: 10px 8px;
+      }
+
+      .config-scroll {
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+        display: flex;
+        flex-direction: row;
+        gap: 0;
+        padding: 10px 12px;
+      }
+
+      .form-row {
+        flex-direction: column;
+        border-bottom: none;
+        border-right: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 0 12px 0 0;
+        min-width: 120px;
+        gap: 8px;
+      }
+
+      .panel-actions {
+        flex-direction: column;
+        border-top: none;
+        border-left: 1px solid var(--border);
+        padding: 12px 10px;
+        min-width: 140px;
+      }
+    }
+
+    /* ── Narrow: everything stacks, sidebar becomes a horizontal card strip ── */
+    @media (max-width: 600px) {
+      .layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+      }
+
+      .sidebar {
+        flex-direction: column;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        overflow-y: hidden;
+        overflow-x: auto;
+        height: auto;
+        padding: 0 12px 12px;
+      }
+
+      .sidebar h2 {
+        margin: 0 -12px;
+        padding: 12px 14px 8px;
+      }
+
+      #overlay-list {
+        flex-direction: row;
+        gap: 8px;
+        padding-bottom: 0;
+      }
+
+      .overlay-card {
+        padding: 10px 14px;
+        flex-shrink: 0;
+      }
+
+      .overlay-card .desc,
+      .overlay-card .author {
+        display: none;
+      }
+
+      .config-panel {
+        grid-column: 1;
+        writing-mode: unset;
+        flex-direction: column;
+        max-height: 260px;
+      }
+
+      .config-panel .panel-head {
+        writing-mode: unset;
+        transform: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+      }
+
+      #overlay-credit {
+        writing-mode: unset;
+        transform: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .config-scroll {
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .form-row {
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 9px 0;
+        min-width: unset;
+      }
+
+      .panel-actions {
+        border-left: none;
+        border-top: 1px solid var(--border);
+        flex-direction: column;
+      }
+    }
+
+    /* ── 7TV Emote Picker ── */
+    #picker-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0, 0, 0, 0.65);
+      align-items: center;
+      justify-content: center;
+    }
+
+    #picker-backdrop.open {
+      display: flex;
+    }
+
+    #picker-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 400px;
+      max-width: 92vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    }
+
+    #picker-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #picker-head span {
+      font-weight: 600;
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    #picker-search {
+      flex: 1;
+      padding: 5px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+    }
+
+    #picker-search:focus {
+      border-color: var(--accent);
+    }
+
+    #picker-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px 4px;
+    }
+
+    #picker-close:hover {
+      color: var(--text);
+    }
+
+    #picker-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      overflow-y: auto;
+      padding: 12px;
+      flex: 1;
+      min-height: 180px;
+    }
+
+    #picker-status {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    .picker-emote {
+      aspect-ratio: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: border-color 0.12s, background 0.12s;
+    }
+
+    .picker-emote:hover {
+      border-color: var(--accent);
+      background: rgba(0, 255, 204, 0.05);
+    }
+
+    .picker-emote img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .icon-field-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .icon-field-row input {
+      flex: 1;
+    }
+
+    .btn-7tv {
+      background: #5c3dc7;
+      color: #fff;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .btn-7tv:hover {
+      background: #7152d4;
+    }
+
+    /* ── Create New card ─────────────────────────────────────────────────── */
+    .overlay-card.create-new {
+      border-style: dashed;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .overlay-card.create-new .name {
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+
+    .overlay-card.create-new:hover .name,
+    .overlay-card.create-new.active .name {
+      color: var(--accent);
+    }
+
+    .overlay-card.create-new.active {
+      border-color: var(--accent);
+      border-style: dashed;
+      background: rgba(0, 255, 204, 0.04);
+    }
+
+    .create-new-plus {
+      font-size: 1.4rem;
+      line-height: 1;
+      flex-shrink: 0;
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+
+    .overlay-card.create-new:hover .create-new-plus,
+    .overlay-card.create-new.active .create-new-plus {
+      color: var(--accent);
+    }
+
+    .sidebar-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 8px 0;
+    }
+
+    /* ── Editor panel layout ─────────────────────────────────────────────── */
+    .editor-panel {
+      border-left: 1px solid var(--border);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .layout.editor-mode {
+      grid-template-columns: minmax(220px, 280px) 1fr minmax(320px, 480px);
+    }
+
+    .layout.editor-mode .config-panel {
+      display: none;
+    }
+
+    .layout.editor-mode .editor-panel {
+      display: flex;
+    }
+
+    /* Editor / Configure tabs */
+    .editor-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 8px;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .editor-tab {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 9px 12px 8px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .editor-tab:hover {
+      color: var(--text);
+    }
+
+    .editor-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Content panes */
+    .editor-pane {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #monaco-host {
+      flex: 1;
+      min-height: 0;
+    }
+
+    #editor-config-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    #editor-config-scroll .no-overlay {
+      padding: 24px 0;
+    }
+
+    /* Inline notice (shown after Submit click) */
+    #editor-notice {
+      padding: 10px 14px;
+      background: rgba(0, 255, 204, 0.06);
+      border-top: 1px solid rgba(0, 255, 204, 0.18);
+      font-size: 0.78rem;
+      color: var(--text);
+      line-height: 1.55;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    #editor-notice-text {
+      margin: 0;
+      flex: 1;
+    }
+
+    #editor-notice-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      line-height: 1;
+      padding: 0;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    #editor-notice-close:hover {
+      color: var(--text);
+    }
+
+    /* ── Responsive: editor panel at medium width ────────────────────────── */
+    @media (max-width: 900px) {
+      .layout.editor-mode {
+        grid-template-columns: minmax(200px, 260px) 1fr;
+        grid-template-rows: 1fr auto;
+      }
+
+      .layout.editor-mode .editor-panel {
+        grid-column: 1 / -1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 300px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .layout.editor-mode .editor-panel {
+        grid-column: 1;
+        max-height: 260px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <a class="nav-brand" href="../index.html">🦶 StepStick</a>
+    <nav class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../setup.html">Get Started</a>
+      <a href="./index.html" class="active">Overlays</a>
+      <a href="../technical.html">Technical</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+
+    <!-- ── Theme list ── -->
+    <div class="sidebar">
+      <h2>Overlays</h2>
+      <div id="overlay-list"></div>
+      <hr class="sidebar-divider">
+      <div class="overlay-card create-new" id="create-new-card">
+        <span class="create-new-plus">＋</span>
+        <div>
+          <div class="name">Create New</div>
+          <div class="desc">Build a custom overlay</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Preview + remote controls ── -->
+    <div class="preview-panel">
+      <div class="preview-area" id="preview-area">
+        <div class="preview-loading" id="preview-loading">← Select an overlay</div>
+        <iframe id="preview-frame" style="display:none"></iframe>
+      </div>
+      <div class="remote-controls">
+        <div class="ctrl-group">
+          <label>Steps/tick</label>
+          <input type="range" id="speed-slider" min="0" max="5" step="0.25" value="1">
+          <span class="ctrl-val" id="speed-val">1×</span>
+        </div>
+        <div class="ctrl-group">
+          <label>Battery</label>
+          <input type="range" id="battery-slider" min="0" max="100" step="5" value="85">
+          <span class="ctrl-val" id="battery-val">85%</span>
+        </div>
+        <div class="ctrl-group">
+          <button class="btn-sm" id="network-btn">Disconnect</button>
+        </div>
+        <div class="ctrl-group" style="margin-left:auto">
+          <label>Size</label>
+          <select class="size-presets" id="size-preset">
+            <option value="">Fill</option>
+            <option value="200x100">200 × 100 — Simple</option>
+            <option value="400x150">400 × 150 — Standard HUD</option>
+            <option value="450x300">450 × 300 — Advanced HUD</option>
+            <option value="manual">Manual</option>
+          </select>
+          <input class="ctrl-num" type="number" id="size-w" min="50" max="3840" placeholder="W">
+          <span class="ctrl-sep">×</span>
+          <input class="ctrl-num" type="number" id="size-h" min="30" max="2160" placeholder="H">
+          <button class="btn-sm" id="size-fill">Fill</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Config panel ── -->
+    <div class="config-panel">
+      <div class="panel-head">Configure</div>
+      <div id="overlay-credit"></div>
+      <div class="config-scroll" id="config-scroll">
+        <div class="no-overlay" id="no-overlay-msg">Select an overlay to configure it.</div>
+      </div>
+      <div class="panel-actions" id="panel-actions" style="display:none">
+        <button class="btn-full btn-download" id="btn-download">⬇ Download Overlay</button>
+        <button class="btn-full btn-import" id="btn-import">↑ Import Saved Overlay</button>
+        <input type="file" id="file-input" accept=".html">
+      </div>
+    </div>
+
+    <!-- ── Editor panel (shown in editor mode, replaces config panel) ── -->
+    <div class="editor-panel" id="editor-panel">
+      <div class="editor-tabs">
+        <button class="editor-tab active" data-tab="code">Editor</button>
+        <button class="editor-tab" data-tab="config">Configure</button>
+      </div>
+      <div class="editor-pane" id="pane-code">
+        <div id="monaco-host"></div>
+      </div>
+      <div class="editor-pane" id="pane-config" style="display:none">
+        <div class="config-scroll" id="editor-config-scroll">
+          <div class="no-overlay" id="editor-no-schema">Edit the <code
+              style="font-size:0.85em;opacity:0.8">stepstick-schema</code> block to add config options here.</div>
+        </div>
+      </div>
+      <div id="editor-notice" style="display:none">
+        <div id="editor-notice-text"></div>
+        <button id="editor-notice-close" title="Dismiss">✕</button>
+      </div>
+      <div class="panel-actions">
+        <button class="btn-full btn-download" id="btn-editor-download">⬇ Download Overlay</button>
+        <button class="btn-full btn-import" id="btn-editor-submit">Submit to Gallery →</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="picker-backdrop">
+    <div id="picker-box">
+      <div id="picker-head">
+        <span>7TV Emotes</span>
+        <input type="text" id="picker-search" placeholder="Search emotes…" autocomplete="off">
+        <button id="picker-close" title="Close">✕</button>
+      </div>
+      <div id="picker-grid">
+        <div id="picker-status">Search for an emote above</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Google Fonts catalogue (curated for stream overlays) ─────────────────
+    var GOOGLE_FONTS = [
+      { group: 'Display', fonts: ['Bebas Neue', 'Anton', 'Oswald', 'Black Han Sans', 'Barlow Condensed', 'Righteous', 'Russo One'] },
+      { group: 'Modern', fonts: ['Inter', 'Montserrat', 'Poppins', 'Raleway', 'Exo 2', 'Orbitron', 'Rajdhani', 'Titillium Web', 'Oxanium'] },
+      { group: 'Clean', fonts: ['Roboto', 'Open Sans', 'Lato', 'Ubuntu', 'Nunito', 'Quicksand', 'Rubik', 'Work Sans', 'DM Sans'] },
+      { group: 'Gaming', fonts: ['Press Start 2P', 'VT323', 'Silkscreen', 'Share Tech Mono'] },
+      { group: 'Creative', fonts: ['Pacifico', 'Lobster', 'Permanent Marker', 'Kaushan Script', 'Boogaloo'] },
+    ];
+
+    // ── Overlay list — driven by overlays/manifest.json ──────────────────────
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    var currentOverlay = null; // { id, name, desc }
+    var currentSchema = [];
+    var currentConfig = {};
+    var currentHtml = '';   // raw overlay HTML text (used for export)
+    var networkConn = true;
+    var iframeReady = false;
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    var frame = document.getElementById('preview-frame');
+    var frameLoading = document.getElementById('preview-loading');
+    var configScroll = document.getElementById('config-scroll');
+    var noOverlayMsg = document.getElementById('no-overlay-msg');
+    var panelActions = document.getElementById('panel-actions');
+
+    // ── Build overlay list ────────────────────────────────────────────────────
+    var listEl = document.getElementById('overlay-list');
+
+    function addOverlayCard(ovl) {
+      var card = document.createElement('div');
+      card.className = 'overlay-card';
+      card.dataset.id = ovl.id;
+      var aiBadge = ovl.aiGenerated
+        ? '<div class="ai-badge">' +
+            '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+              '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>' +
+              '<path d="M8 5v4M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
+            '</svg>' +
+            'AI-generated code' +
+          '</div>'
+        : '';
+      card.innerHTML =
+        '<div class="name">' + esc(ovl.name) + '</div>' +
+        '<div class="desc">' + esc(ovl.desc || '') + '</div>' +
+        (ovl.author ? '<div class="author">by ' + esc(ovl.author) + '</div>' : '') +
+        aiBadge;
+      card.addEventListener('click', function () { selectOverlay(ovl); });
+      listEl.appendChild(card);
+    }
+
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:8px 4px;opacity:0.6">Loading…</div>';
+    fetch('overlays/manifest.json')
+      .then(function (r) { return r.json(); })
+      .then(function (overlays) {
+        listEl.innerHTML = '';
+        overlays.forEach(addOverlayCard);
+      })
+      .catch(function () {
+        listEl.innerHTML = '<div style="color:var(--danger);font-size:0.8rem;padding:8px 4px">Could not load overlay list.</div>';
+      });
+
+    // ── Select & load an overlay ──────────────────────────────────────────────
+    function selectOverlay(ovl) {
+      if (currentOverlay && currentOverlay.id === ovl.id && !editorMode) return;
+      maybeExitEditorMode();
+      currentOverlay = ovl;
+      currentConfig = {};
+      iframeReady = false;
+
+      // Update active card
+      document.querySelectorAll('.overlay-card').forEach(function (c) {
+        c.classList.toggle('active', c.dataset.id === ovl.id);
+      });
+
+      // Load overlay HTML as text, parse schema, then load iframe
+      var url = 'overlays/' + ovl.id + '.html';
+      fetch(url).then(function (r) { return r.text(); }).then(function (html) {
+        currentHtml = html;
+
+        // Parse schema and meta from the raw HTML text using DOMParser (safe — no eval)
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var schemaEl = doc.getElementById('stepstick-schema');
+        var metaEl = doc.getElementById('stepstick-meta');
+        try {
+          currentSchema = JSON.parse(schemaEl ? schemaEl.textContent : '[]');
+        } catch (_) {
+          currentSchema = [];
+        }
+
+        var meta = {};
+        try { meta = JSON.parse(metaEl ? metaEl.textContent : '{}'); } catch (_) { }
+
+        // Show author credit
+        var creditEl = document.getElementById('overlay-credit');
+        if (meta.author) {
+          creditEl.style.display = '';
+          creditEl.innerHTML = 'by ' + (meta.authorUrl
+            ? '<a href="' + esc(meta.authorUrl) + '" target="_blank" rel="noopener">' + esc(meta.author) + '</a>'
+            : esc(meta.author));
+        } else {
+          creditEl.style.display = 'none';
+          creditEl.innerHTML = '';
+        }
+
+        // Seed config with schema defaults
+        currentSchema.forEach(function (field) {
+          currentConfig[field.key] = field.default;
+        });
+
+        buildForm();
+        panelActions.style.display = '';
+        noOverlayMsg.style.display = 'none';
+
+        // Build preview HTML for srcdoc:
+        //   1. <base> so Google Fonts / relative URLs resolve from the overlays folder
+        //   2. __STEPSTICK_DEMO__ flag — srcdoc has no URL params, so we inject it
+        //   3. Swap GitHub Pages src for the locally-served docs/stepstick.js
+        var overlayBase = new URL('overlays/', window.location.href).href;
+        var previewHtml = html
+          .replace('<head>', '<head><base href="' + overlayBase + '">')
+          .replace('<script', '<script>window.__STEPSTICK_DEMO__=true;<' + '/script>\n  <script')
+          .replace('src="https://jhlwscom.github.io/stepstick/stepstick.js"', 'src="../../stepstick.js"');
+
+        frameLoading.style.display = '';
+        frame.style.display = 'none';
+        frame.srcdoc = previewHtml;
+        frame.onload = function () {
+          iframeReady = true;
+          frame.style.display = 'block';
+          frameLoading.style.display = 'none';
+          applySize();
+          sendBatchUpdate();
+          syncRemoteControls();
+        };
+      }).catch(function (err) {
+        console.error('Failed to load overlay:', err);
+      });
+    }
+
+    // ── Dynamic config form ───────────────────────────────────────────────────
+    function buildForm(targetEl) {
+      targetEl = targetEl || configScroll;
+      targetEl.innerHTML = '';
+      currentSchema.forEach(function (field) {
+        var val = currentConfig[field.key];
+        if (val === undefined) val = field.default;
+
+        var row = document.createElement('div');
+        row.className = 'form-row';
+
+        if (field.type === 'color') {
+          row.innerHTML =
+            '<label>' + esc(field.label) + '</label>' +
+            '<input type="color" data-key="' + esc(field.key) + '" value="' + esc(String(val)) + '">';
+        } else if (field.type === 'checkbox') {
+          row.innerHTML =
+            '<label>' + esc(field.label) + '</label>' +
+            '<label class="switch">' +
+            '<input type="checkbox" data-key="' + esc(field.key) + '"' + (val ? ' checked' : '') + '>' +
+            '<span class="slider"></span>' +
+            '</label>';
+        } else if (field.type === 'text') {
+          row.style.flexDirection = 'column';
+          row.style.alignItems = 'stretch';
+          row.style.gap = '5px';
+          row.innerHTML =
+            '<label>' + esc(field.label) + '</label>' +
+            '<input type="text" data-key="' + esc(field.key) + '" value="' + esc(String(val)) + '" ' +
+            'placeholder="' + esc(String(field.default || '')) + '" ' +
+            'style="padding:5px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:0.82rem;outline:none;width:100%">';
+        } else if (field.type === 'icon') {
+          row.style.flexDirection = 'column';
+          row.style.alignItems = 'stretch';
+          row.style.gap = '5px';
+          row.innerHTML =
+            '<label>' + esc(field.label) + '</label>' +
+            '<div class="icon-field-row">' +
+            '<input type="text" data-key="' + esc(field.key) + '" value="' + esc(String(val)) + '" ' +
+            'placeholder="emoji or image URL" ' +
+            'style="padding:5px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:0.82rem;outline:none">' +
+            '<button class="btn-7tv" data-picker-key="' + esc(field.key) + '">7TV</button>' +
+            '</div>';
+          row.querySelector('.btn-7tv').addEventListener('click', function () {
+            openPicker(this.dataset.pickerKey);
+          });
+        } else if (field.type === 'font') {
+          row.style.flexDirection = 'column';
+          row.style.alignItems = 'stretch';
+          row.style.gap = '5px';
+          var opts = '';
+          GOOGLE_FONTS.forEach(function (grp) {
+            opts += '<optgroup label="' + esc(grp.group) + '">';
+            grp.fonts.forEach(function (name) {
+              opts += '<option value="' + esc(name) + '"' + (val === name ? ' selected' : '') + '>' + esc(name) + '</option>';
+            });
+            opts += '</optgroup>';
+          });
+          row.innerHTML =
+            '<label>' + esc(field.label) + '</label>' +
+            '<select data-key="' + esc(field.key) + '">' + opts + '</select>';
+        }
+
+        row.querySelectorAll('[data-key]').forEach(function (input) {
+          input.addEventListener('change', onFormChange);
+        });
+
+        targetEl.appendChild(row);
+      });
+    }
+
+    function onFormChange(e) {
+      var key = e.target.dataset.key;
+      var isCheck = e.target.type === 'checkbox';
+      currentConfig[key] = isCheck ? e.target.checked : e.target.value;
+      sendBatchUpdate();
+    }
+
+    function sendBatchUpdate() {
+      if (!iframeReady || !frame.contentWindow) return;
+      frame.contentWindow.postMessage({ action: 'batch_update', value: currentConfig }, '*');
+    }
+
+    // ── Remote controls ───────────────────────────────────────────────────────
+    function postToFrame(msg) {
+      if (!iframeReady || !frame.contentWindow) return;
+      frame.contentWindow.postMessage(msg, '*');
+    }
+
+    function syncRemoteControls() {
+      postToFrame({ action: 'speed', value: parseFloat(document.getElementById('speed-slider').value) });
+      postToFrame({ action: 'battery', value: parseInt(document.getElementById('battery-slider').value) });
+      if (!networkConn) postToFrame({ action: 'network', value: 'disconnect' });
+    }
+
+    document.getElementById('speed-slider').addEventListener('input', function () {
+      var v = parseFloat(this.value);
+      document.getElementById('speed-val').textContent = v + '×';
+      postToFrame({ action: 'speed', value: v });
+    });
+
+    document.getElementById('battery-slider').addEventListener('input', function () {
+      var v = parseInt(this.value);
+      document.getElementById('battery-val').textContent = v + '%';
+      postToFrame({ action: 'battery', value: v });
+    });
+
+    document.getElementById('network-btn').addEventListener('click', function () {
+      networkConn = !networkConn;
+      this.textContent = networkConn ? 'Disconnect' : 'Reconnect';
+      this.classList.toggle('danger', !networkConn);
+      postToFrame({ action: 'network', value: networkConn ? 'connect' : 'disconnect' });
+    });
+
+    // ── Size controls ─────────────────────────────────────────────────────────
+    var previewArea = document.getElementById('preview-area');
+    var sizeW = document.getElementById('size-w');
+    var sizeH = document.getElementById('size-h');
+    var sizePreset = document.getElementById('size-preset');
+
+    var SCALE_PADDING = 28; // px of breathing room around the scaled iframe
+
+    function rescale() {
+      var w = parseInt(sizeW.value);
+      var h = parseInt(sizeH.value);
+      if (!w || !h) return;
+      var availW = previewArea.clientWidth - SCALE_PADDING * 2;
+      var availH = previewArea.clientHeight - SCALE_PADDING * 2;
+      var scale = Math.min(availW / w, availH / h);
+      frame.style.transform = 'scale(' + scale + ')';
+      frame.style.transformOrigin = 'center center';
+    }
+
+    function applySize() {
+      var w = parseInt(sizeW.value);
+      var h = parseInt(sizeH.value);
+      if (w > 0 && h > 0) {
+        frame.style.width = w + 'px';
+        frame.style.height = h + 'px';
+        previewArea.classList.add('sized');
+        rescale();
+      } else {
+        frame.style.width = '100%';
+        frame.style.height = '100%';
+        frame.style.transform = '';
+        previewArea.classList.remove('sized');
+      }
+    }
+
+    // Keep the scale correct as the panel resizes (e.g. window resize, sidebar drag)
+    new ResizeObserver(function () {
+      if (previewArea.classList.contains('sized')) rescale();
+    }).observe(previewArea);
+
+    sizeW.addEventListener('change', function () { sizePreset.value = 'manual'; applySize(); });
+    sizeH.addEventListener('change', function () { sizePreset.value = 'manual'; applySize(); });
+
+    sizePreset.addEventListener('change', function () {
+      var val = this.value;
+      if (!val) {
+        sizeW.value = '';
+        sizeH.value = '';
+      } else if (val !== 'manual') {
+        var parts = val.split('x');
+        sizeW.value = parts[0];
+        sizeH.value = parts[1];
+      }
+      // 'manual': leave W/H as-is, just apply whatever is currently in the inputs
+      applySize();
+    });
+
+    document.getElementById('size-fill').addEventListener('click', function () {
+      sizeW.value = '';
+      sizeH.value = '';
+      sizePreset.value = '';
+      applySize();
+    });
+
+    // ── Download (HTML compiler) ──────────────────────────────────────────────
+    document.getElementById('btn-download').addEventListener('click', function () {
+      if (!currentHtml) return;
+      var configJson = JSON.stringify(currentConfig, null, 2);
+      // Inject config into the stepstick-config script block
+      var compiled = currentHtml.replace(
+        /(<script\s[^>]*id="stepstick-config"[^>]*>)[^<]*(<\/script>)/,
+        '$1' + configJson + '$2'
+      );
+      var blob = new Blob([compiled], { type: 'text/html' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'stepstick-' + (currentOverlay ? currentOverlay.id : 'overlay') + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // ── Import (round-trip extractor) ─────────────────────────────────────────
+    document.getElementById('btn-import').addEventListener('click', function () {
+      document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      this.value = '';
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var html = e.target.result;
+        // Extract stepstick-config block via regex (no eval)
+        var match = html.match(/<script\s[^>]*id="stepstick-config"[^>]*>([\s\S]*?)<\/script>/);
+        if (!match) { alert('No stepstick-config block found in this file.'); return; }
+        var imported;
+        try { imported = JSON.parse(match[1]); } catch (_) { alert('Could not parse config in this file.'); return; }
+        // Merge imported values into currentConfig
+        Object.assign(currentConfig, imported);
+        // Re-hydrate form inputs
+        document.querySelectorAll('#config-scroll [data-key]').forEach(function (input) {
+          var key = input.dataset.key;
+          if (currentConfig[key] === undefined) return;
+          if (input.type === 'checkbox') {
+            input.checked = !!currentConfig[key];
+          } else {
+            input.value = currentConfig[key];
+          }
+        });
+        sendBatchUpdate();
+      };
+      reader.readAsText(file);
+    });
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ── 7TV Emote Picker ─────────────────────────────────────────────────────
+    var pickerTargetKey = null;
+    var pickerSearchTimer = null;
+
+    function openPicker(key) {
+      pickerTargetKey = key;
+      document.getElementById('picker-backdrop').classList.add('open');
+      var searchEl = document.getElementById('picker-search');
+      searchEl.value = '';
+      searchEl.focus();
+      setPickerStatus('Search for an emote above');
+    }
+
+    function closePicker() {
+      document.getElementById('picker-backdrop').classList.remove('open');
+      pickerTargetKey = null;
+    }
+
+    function setPickerStatus(msg) {
+      var grid = document.getElementById('picker-grid');
+      grid.innerHTML = '<div id="picker-status">' + esc(msg) + '</div>';
+    }
+
+    var GQL_QUERY = 'query SearchEmotes($q:String!,$p:Int,$n:Int){emotes(query:$q,page:$p,limit:$n){count items{id name host{url files{name format}}}}}';
+
+    function searchEmotes(query) {
+      if (!query.trim()) { setPickerStatus('Search for an emote above'); return; }
+      setPickerStatus('Searching…');
+      fetch('https://7tv.io/v3/gql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: GQL_QUERY, variables: { q: query, p: 1, n: 24 } })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var items = data.data && data.data.emotes && data.data.emotes.items;
+          var grid = document.getElementById('picker-grid');
+          grid.innerHTML = '';
+          if (!items || !items.length) { setPickerStatus('No results for "' + query + '"'); return; }
+          items.forEach(function (emote) {
+            var files = emote.host.files || [];
+            var has4x = files.some(function (f) { return f.name === '4x.webp'; });
+            var base = 'https:' + emote.host.url + '/';
+            var thumbUrl = base + '2x.webp';
+            var fullUrl = base + (has4x ? '4x' : '2x') + '.webp';
+            var btn = document.createElement('button');
+            btn.className = 'picker-emote';
+            btn.title = emote.name;
+            btn.innerHTML = '<img src="' + thumbUrl + '" alt="' + esc(emote.name) + '" loading="lazy">';
+            btn.addEventListener('click', function () { selectEmote(fullUrl); });
+            grid.appendChild(btn);
+          });
+        })
+        .catch(function () { setPickerStatus('Could not reach 7TV — check your connection'); });
+    }
+
+    function selectEmote(url) {
+      if (!pickerTargetKey) return;
+      var input = document.querySelector('[data-key="' + pickerTargetKey + '"]');
+      if (input) input.value = url;
+      currentConfig[pickerTargetKey] = url;
+      sendBatchUpdate();
+      closePicker();
+    }
+
+    document.getElementById('picker-search').addEventListener('input', function () {
+      clearTimeout(pickerSearchTimer);
+      var q = this.value;
+      pickerSearchTimer = setTimeout(function () { searchEmotes(q); }, 380);
+    });
+    document.getElementById('picker-search').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { clearTimeout(pickerSearchTimer); searchEmotes(this.value); }
+      if (e.key === 'Escape') closePicker();
+    });
+    document.getElementById('picker-close').addEventListener('click', closePicker);
+    document.getElementById('picker-backdrop').addEventListener('click', function (e) {
+      if (e.target === this) closePicker();
+    });
+
+    // ── Editor mode ───────────────────────────────────────────────────────────
+    var editorMode = false;
+    var monacoEditor = null;
+    var monacoScriptLoaded = false;   // true once the CDN script tag is injected
+    var monacoPendingValue = null;    // template HTML to load once Monaco is ready
+    var editorDebounce = null;
+    var lastEditorSchemaStr = '';
+
+    document.getElementById('create-new-card').addEventListener('click', function () {
+      if (editorMode) return;
+      selectCreateNew();
+    });
+
+    function selectCreateNew() {
+      currentOverlay = null;
+      currentSchema = [];
+      currentConfig = {};
+      iframeReady = false;
+      lastEditorSchemaStr = '';
+
+      document.querySelectorAll('.overlay-card').forEach(function (c) { c.classList.remove('active'); });
+      document.getElementById('create-new-card').classList.add('active');
+      document.getElementById('overlay-credit').style.display = 'none';
+      document.getElementById('overlay-credit').innerHTML = '';
+      panelActions.style.display = 'none';
+      noOverlayMsg.style.display = 'none';
+
+      editorMode = true;
+      document.querySelector('.layout').classList.add('editor-mode');
+      switchEditorTab('code');
+
+      frameLoading.textContent = 'Loading editor…';
+      frameLoading.style.display = '';
+      frame.style.display = 'none';
+      frame.srcdoc = '';
+
+      fetch('overlays/template.html')
+        .then(function (r) { return r.text(); })
+        .then(function (html) { initMonaco(html); })
+        .catch(function () {
+          if (editorMode) frameLoading.textContent = 'Could not load template — check your connection.';
+        });
+    }
+
+    function maybeExitEditorMode() {
+      if (!editorMode) return;
+      editorMode = false;
+      lastEditorSchemaStr = '';
+      document.querySelector('.layout').classList.remove('editor-mode');
+      document.getElementById('create-new-card').classList.remove('active');
+      frameLoading.textContent = '← Select an overlay';
+    }
+
+    function initMonaco(initialValue) {
+      if (monacoEditor) {
+        monacoEditor.setValue(initialValue);
+        triggerEditorUpdate();
+        return;
+      }
+      monacoPendingValue = initialValue;
+      if (monacoScriptLoaded) return;   // still loading; monacoPendingValue will be picked up
+      monacoScriptLoaded = true;
+
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.50.0/min/vs/loader.js';
+      s.onload = function () {
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.50.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+          monacoEditor = monaco.editor.create(document.getElementById('monaco-host'), {
+            value: monacoPendingValue || '',
+            language: 'html',
+            theme: 'vs-dark',
+            fontSize: 13,
+            lineHeight: 20,
+            wordWrap: 'on',
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            folding: true,
+          });
+          monacoEditor.onDidChangeModelContent(function () {
+            clearTimeout(editorDebounce);
+            editorDebounce = setTimeout(triggerEditorUpdate, 700);
+          });
+          if (editorMode) triggerEditorUpdate();
+        });
+      };
+      document.head.appendChild(s);
+    }
+
+    function triggerEditorUpdate() {
+      if (!editorMode || !monacoEditor) return;
+      var html = monacoEditor.getValue();
+
+      // Parse schema from the editor HTML and rebuild Configure tab if it changed
+      var parsed = new DOMParser().parseFromString(html, 'text/html');
+      var schemaEl = parsed.getElementById('stepstick-schema');
+      var newSchema;
+      try { newSchema = JSON.parse(schemaEl ? schemaEl.textContent : '[]'); }
+      catch (_) { newSchema = []; }
+
+      var schemaStr = JSON.stringify(newSchema);
+      if (schemaStr !== lastEditorSchemaStr) {
+        lastEditorSchemaStr = schemaStr;
+        currentSchema = newSchema;
+
+        // Carry over values for keys that still exist; seed defaults for new ones
+        var carried = {};
+        newSchema.forEach(function (field) {
+          carried[field.key] = (currentConfig[field.key] !== undefined)
+            ? currentConfig[field.key]
+            : field.default;
+        });
+        currentConfig = carried;
+
+        var editorScroll = document.getElementById('editor-config-scroll');
+        var noSchemaMsg = document.getElementById('editor-no-schema');
+        if (newSchema.length) {
+          noSchemaMsg.style.display = 'none';
+          buildForm(editorScroll);
+        } else {
+          editorScroll.innerHTML = '';
+          editorScroll.appendChild(noSchemaMsg);
+          noSchemaMsg.style.display = '';
+        }
+      }
+
+      // Rebuild the preview iframe
+      iframeReady = false;
+      var overlayBase = new URL('overlays/', window.location.href).href;
+      var previewHtml = html
+        .replace('<head>', '<head><base href="' + overlayBase + '">')
+        .replace('<script', '<script>window.__STEPSTICK_DEMO__=true;<' + '/script>\n  <script')
+        .replace('src="https://jhlwscom.github.io/stepstick/stepstick.js"', 'src="../../stepstick.js"');
+
+      frame.srcdoc = previewHtml;
+      frame.style.display = 'block';
+      frameLoading.style.display = 'none';
+      frame.onload = function () {
+        iframeReady = true;
+        applySize();
+        sendBatchUpdate();
+        syncRemoteControls();
+      };
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    function switchEditorTab(tab) {
+      document.querySelectorAll('.editor-tab').forEach(function (t) {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.getElementById('pane-code').style.display = tab === 'code' ? '' : 'none';
+      document.getElementById('pane-config').style.display = tab === 'config' ? '' : 'none';
+      if (tab === 'code' && monacoEditor) {
+        setTimeout(function () { monacoEditor.layout(); }, 0);
+      }
+    }
+
+    document.querySelectorAll('.editor-tab').forEach(function (tab) {
+      tab.addEventListener('click', function () { switchEditorTab(this.dataset.tab); });
+    });
+
+    // ── Editor download ───────────────────────────────────────────────────────
+    document.getElementById('btn-editor-download').addEventListener('click', function () {
+      if (!monacoEditor) return;
+      var blob = new Blob([monacoEditor.getValue()], { type: 'text/html' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'my-stepstick-overlay.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // ── Submit to gallery ─────────────────────────────────────────────────────
+    document.getElementById('btn-editor-submit').addEventListener('click', function () {
+      if (!monacoEditor) return;
+      var html     = monacoEditor.getValue();
+      var notice   = document.getElementById('editor-notice');
+      var noticeEl = document.getElementById('editor-notice-text');
+
+      // Parse meta block to auto-generate the manifest.json entry
+      var parsed  = new DOMParser().parseFromString(html, 'text/html');
+      var metaEl  = parsed.getElementById('stepstick-meta');
+      var meta    = {};
+      try { meta = JSON.parse(metaEl ? metaEl.textContent : '{}'); } catch (_) {}
+
+      var suggestedId = (meta.name || 'my-overlay')
+        .toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      var manifestEntry = JSON.stringify({
+        id:        suggestedId,
+        name:      meta.name        || 'My Overlay',
+        desc:      meta.description || '',
+        author:    meta.author      || '',
+        authorUrl: meta.authorUrl   || ''
+      });
+
+      var codeStyle  = 'background:rgba(0,0,0,0.35);padding:1px 5px;border-radius:3px;font-size:0.9em';
+      var blockStyle = 'display:block;background:rgba(0,0,0,0.35);margin-top:5px;padding:6px 8px;' +
+                       'border-radius:4px;font-size:0.85em;word-break:break-all;white-space:pre-wrap;line-height:1.4';
+
+      function buildNotice(copied) {
+        noticeEl.innerHTML =
+          (copied ? '<strong>HTML copied!</strong> ' : '<strong>GitHub tab opened.</strong> ') +
+          'Name the file <code style="' + codeStyle + '">' + esc(suggestedId) + '.html</code>' +
+          (copied ? ', paste' : ', copy your code and paste it') +
+          ', then click <em>"Propose new file"</em>.<br><br>' +
+          'Also add this line to <code style="' + codeStyle + '">manifest.json</code> in a separate edit:' +
+          '<code style="' + blockStyle + '">' + esc(manifestEntry) + '</code>';
+        notice.style.display = '';
+      }
+
+      window.open('https://github.com/jhlwscom/stepstick/new/main/docs/gallery/overlays', '_blank', 'noopener');
+      navigator.clipboard.writeText(html)
+        .then(function () { buildNotice(true); })
+        .catch(function () { buildNotice(false); });
+    });
+
+    document.getElementById('editor-notice-close').addEventListener('click', function () {
+      document.getElementById('editor-notice').style.display = 'none';
+    });
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "simple",
+    "name": "Simple Counter",
+    "desc": "Just the number — font & colour",
+    "author": "jhlws",
+    "authorUrl": "https://github.com/jhlwscom",
+    "aiGenerated": true
+  },
+  {
+    "id": "standard",
+    "name": "Standard HUD",
+    "desc": "Step counter with activity icon",
+    "author": "jhlws",
+    "authorUrl": "https://github.com/jhlwscom",
+    "aiGenerated": true
+  },
+  {
+    "id": "advanced",
+    "name": "Advanced HUD",
+    "desc": "Standard HUD + steps/min chart",
+    "author": "jhlws",
+    "authorUrl": "https://github.com/jhlwscom",
+    "aiGenerated": true
+  },
+  {
+    "id": "cyberpunk",
+    "name": "Cyberpunk",
+    "desc": "Stylised cyberpunk example",
+    "author": "jhlws",
+    "authorUrl": "https://github.com/jhlwscom",
+    "aiGenerated": true
+  },
+  {
+    "id": "horror",
+    "name": "Horror",
+    "desc": "Analogue horror-esque",
+    "author": "jhlws",
+    "authorUrl": "https://github.com/jhlwscom",
+    "aiGenerated": true
+  }
+]

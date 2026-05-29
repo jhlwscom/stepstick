@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link id="gfont" rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap">
+
+    <script id="stepstick-meta" type="application/json">
+  {
+    "name":        "CyberHUD Tracker",
+    "description": "A futuristic, neon-glowing telemetry HUD.",
+    "author":      "Gemini",
+    "authorUrl":   "https://gemini.google.com"
+  }
+  </script>
+
+    <script id="stepstick-schema" type="application/json">
+  [
+    { "key": "bgColor",       "label": "Armor Panel (BG)",     "type": "color",    "default": "#050a15" },
+    { "key": "textColor",     "label": "Primary Text",         "type": "color",    "default": "#e0f7fa" },
+    { "key": "accentColor",   "label": "Neon Glow (Walk)",     "type": "color",    "default": "#00f3ff" },
+    { "key": "dangerColor",   "label": "Overdrive/Warn",       "type": "color",    "default": "#ff003c" },
+    { "key": "showScanlines", "label": "CRT Scanlines",        "type": "checkbox", "default": true },
+    { "key": "fontFamily",    "label": "Font",                 "type": "font",     "default": "Orbitron" },
+    { "key": "iconStill",     "label": "Standby Icon",         "type": "icon",     "default": "🛑" },
+    { "key": "iconWalk",      "label": "Active Icon",          "type": "icon",     "default": "⚡" },
+    { "key": "iconRun",       "label": "Overdrive Icon",       "type": "icon",     "default": "🚀" }
+  ]
+  </script>
+
+    <script id="stepstick-config" type="application/json">{}</script>
+
+    <script src="https://jhlwscom.github.io/stepstick/stepstick.js"></script>
+
+    <style>
+        /* RESPONSIVE SIZING & CSS VARIABLES */
+        :root {
+            /* Fallback variables, strictly overridden by applyConfig() */
+            --bg: #050a15;
+            --text: #e0f7fa;
+            --accent: #00f3ff;
+            --danger: #ff003c;
+        }
+
+        html {
+            font-size: 4vw;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            color: var(--text);
+        }
+
+        /* WIDGET CONTAINER - Angled Cyberpunk Panel */
+        .widget {
+            position: relative;
+            display: inline-flex;
+            flex-direction: row;
+            align-items: center;
+            background: rgba(5, 10, 21, 0.85);
+            /* Slightly transparent base */
+            backdrop-filter: blur(0.25rem);
+            /* Clipped corners for a sci-fi shape */
+            clip-path: polygon(1rem 0, 100% 0, 100% calc(100% - 1rem), calc(100% - 1rem) 100%, 0 100%, 0 1rem);
+            padding: 1rem 1.75rem;
+            gap: 1.5rem;
+            border-left: 0.35rem solid var(--accent);
+            box-shadow: 0 0 2rem rgba(0, 0, 0, 0.5);
+            transition: border-color 0.3s ease;
+        }
+
+        /* CRT SCANLINES OVERLAY */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom,
+                    rgba(255, 255, 255, 0),
+                    rgba(255, 255, 255, 0) 50%,
+                    rgba(0, 0, 0, 0.2) 50%,
+                    rgba(0, 0, 0, 0.2));
+            background-size: 100% 0.25rem;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0.6;
+        }
+
+        /* HUD METRICS & LAYOUT */
+        .metric {
+            display: flex;
+            flex-direction: column;
+            z-index: 2;
+        }
+
+        .hud-title {
+            font-size: 0.6rem;
+            font-weight: 900;
+            letter-spacing: 0.2rem;
+            color: var(--accent);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        /* STEP COUNT */
+        .step-value {
+            font-size: 3rem;
+            font-weight: 900;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 0.5rem var(--accent);
+            min-width: 5ch;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1rem;
+            opacity: 0.7;
+        }
+
+        /* DIVIDER */
+        .divider {
+            width: 0.15rem;
+            height: 3.5rem;
+            background: var(--text);
+            opacity: 0.2;
+            z-index: 2;
+        }
+
+        /* ACTIVITY STATUS AREA */
+        .status-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 6rem;
+            z-index: 2;
+        }
+
+        .activity-text {
+            font-size: 0.65rem;
+            font-weight: 900;
+            letter-spacing: 0.1rem;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+
+        .activity-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            font-size: 2.25rem;
+            line-height: 1;
+            opacity: 0.4;
+            transition: filter 0.3s ease, opacity 0.3s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateZ(0) scale(0.9);
+            will-change: filter, transform;
+        }
+
+        .activity-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .activity-icon.active {
+            opacity: 1;
+            transform: translateZ(0) scale(1.1);
+        }
+
+        /* DYNAMIC STATES (Standby, Walk, Run) */
+        .state-standby .activity-text {
+            color: var(--text);
+            opacity: 0.5;
+        }
+
+        .state-walk .activity-text {
+            color: var(--accent);
+            text-shadow: 0 0 0.4rem var(--accent);
+        }
+
+        .state-run .activity-text {
+            color: var(--danger);
+            text-shadow: 0 0 0.4rem var(--danger);
+        }
+
+        .state-run.widget {
+            border-left-color: var(--danger);
+        }
+
+        /* Shift border color when running */
+
+        /* BATTERY WARNING */
+        .battery-warn {
+            display: none;
+            position: absolute;
+            bottom: -1.25rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            font-weight: 900;
+            letter-spacing: 0.1rem;
+            color: var(--danger);
+            background: rgba(5, 10, 21, 0.9);
+            border: 1px solid var(--danger);
+            padding: 0.15rem 0.75rem;
+            white-space: nowrap;
+            box-shadow: 0 0 0.5rem var(--danger);
+            animation: alert-flash 1s steps(2, start) infinite;
+            z-index: 20;
+        }
+
+        .battery-warn.visible {
+            display: block;
+        }
+
+        @keyframes alert-flash {
+
+            0%,
+            100% {
+                opacity: 1;
+                background: rgba(5, 10, 21, 0.9);
+                color: var(--danger);
+            }
+
+            50% {
+                opacity: 0.8;
+                background: var(--danger);
+                color: #000;
+            }
+        }
+
+        /* DISCONNECTED STATE */
+        body.is-disconnected .widget {
+            opacity: 0.3;
+            filter: grayscale(100%) blur(2px);
+            transition: all 1s ease;
+        }
+
+        body.is-connected .widget {
+            opacity: 1;
+            filter: grayscale(0%) blur(0);
+            transition: all 0.3s ease;
+        }
+    </style>
+    <style id="dyn"></style>
+</head>
+
+<body>
+
+    <div class="widget state-standby" id="widget">
+        <div class="scanlines" id="scanlines"></div>
+
+        <div class="metric">
+            <div class="hud-title">SYS.TRACKER</div>
+            <div class="step-value" id="steps">00000</div>
+            <div class="step-label">LIFESIGNS // STEPS</div>
+        </div>
+
+        <div class="divider" id="divider"></div>
+
+        <div class="status-area" id="activity-wrap">
+            <div class="activity-text" id="activity-text">STANDBY</div>
+            <div class="activity-icon" id="activity">🛑</div>
+        </div>
+
+        <div class="battery-warn" id="battery-warn">[ PWR CRITICAL ]</div>
+    </div>
+
+    <script>
+        function bool(v, def) {
+            if (v === undefined || v === null) return def !== undefined ? def : true;
+            if (typeof v === 'boolean') return v;
+            return v !== 'false' && v !== '0' && v !== '';
+        }
+
+        var overlay = new StepStick();
+        var lastFont = '';
+
+        function applyConfig() {
+            // Fetch Config values
+            var bg = overlay.config('bgColor') || '#050a15';
+            var text = overlay.config('textColor') || '#e0f7fa';
+            var accent = overlay.config('accentColor') || '#00f3ff';
+            var danger = overlay.config('dangerColor') || '#ff003c';
+            var font = overlay.config('fontFamily') || 'Orbitron';
+            var scanOn = bool(overlay.config('showScanlines'), true);
+
+            // Apply CSS Variables to :root for clean styling throughout
+            var root = document.documentElement;
+            root.style.setProperty('--bg', bg);
+            root.style.setProperty('--text', text);
+            root.style.setProperty('--accent', accent);
+            root.style.setProperty('--danger', danger);
+
+            // The background uses a slightly transparent version of the hex
+            document.getElementById('widget').style.background = bg + 'd9'; // d9 ≈ 85% opacity
+            document.body.style.fontFamily = "'" + font + "', sans-serif";
+
+            // Font updates
+            if (font !== lastFont) {
+                lastFont = font;
+                document.getElementById('gfont').href =
+                    'https://fonts.googleapis.com/css2?family=' +
+                    encodeURIComponent(font) + ':wght@400;700;900&display=swap';
+            }
+
+            // UI Toggles
+            document.getElementById('scanlines').style.display = scanOn ? 'block' : 'none';
+
+            // Dynamic Filter Styles for Icons
+            document.getElementById('dyn').textContent =
+                '.activity-icon             { filter: grayscale(100%); }\n' +
+                '.activity-icon.active-walk { filter: grayscale(0%) drop-shadow(0 0 0.5rem ' + accent + '); }\n' +
+                '.activity-icon.active-run  { filter: grayscale(0%) drop-shadow(0 0 0.75rem ' + danger + '); }\n';
+        }
+
+        applyConfig();
+
+        var ICON_KEYS = ['iconStill', 'iconWalk', 'iconRun'];
+        var ICON_DEFAULTS = ['🛑', '⚡', '🚀'];
+        var TEXT_STATES = ['STANDBY', 'ENGAGED', 'OVERDRIVE'];
+
+        function resolveIcon(state) {
+            var custom = (overlay.config(ICON_KEYS[state]) || '').trim();
+            return custom || ICON_DEFAULTS[state];
+        }
+
+        function renderIcon(el, state) {
+            var icon = resolveIcon(state);
+            if (icon.startsWith('http')) {
+                el.innerHTML = '<img src="' + icon + '" alt="">';
+            } else {
+                el.textContent = icon;
+            }
+        }
+
+        var lastState = 0;
+
+        overlay.on('config', function () {
+            renderIcon(document.getElementById('activity'), lastState);
+            applyConfig();
+        });
+
+        overlay.on('telemetry', function (data) {
+
+            if (data.steps !== undefined) {
+                // Pads step count with leading zeros for that digital dashboard look
+                document.getElementById('steps').textContent = String(data.steps).padStart(5, '0');
+            }
+
+            if (data.state !== undefined) {
+                lastState = data.state;
+
+                // Update Widget Wrapper State (for border colors)
+                var widget = document.getElementById('widget');
+                widget.classList.remove('state-standby', 'state-walk', 'state-run');
+
+                // Update Text Label
+                document.getElementById('activity-text').textContent = TEXT_STATES[data.state] || 'UNKNOWN';
+
+                // Update Icon Classes
+                var el = document.getElementById('activity');
+                el.className = 'activity-icon';
+
+                if (data.state === 0) {
+                    widget.classList.add('state-standby');
+                } else if (data.state === 1) {
+                    widget.classList.add('state-walk');
+                    el.classList.add('active', 'active-walk');
+                } else if (data.state === 2) {
+                    widget.classList.add('state-run');
+                    el.classList.add('active', 'active-run');
+                }
+
+                renderIcon(el, data.state);
+            }
+
+            if (data.battery !== undefined) {
+                document.getElementById('battery-warn').classList.toggle('visible', data.battery <= 15);
+            }
+
+        });
+    </script>
+</body>
+
+</html>
