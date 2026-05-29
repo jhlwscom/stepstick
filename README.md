@@ -44,9 +44,12 @@ This repository uses **Renovate** to strictly manage C++/Arduino library version
 
 ## AI Policy
 
-A lot of this code is AI-generated. This was partly a learning project, for a software engineer to learn how to use AI tools to keep up with the quickly changing development landscape. All generated code was reviewed and understood before being committed.
+**Code:** I used AI to help write this to get a feel for modern dev tools. I made sure to review and test the generated code before pushing it.
 
-**On art and icons:** No AI-generated art is included in this project. The overlay themes ship without bundled icons. If you are customising with your own icons, please hire a human artist.
+**Assets:** There's no AI art here. The overlays ship without icons, so if you want to add your own, please support a human artist.
 
 ---
 
+## License
+
+MIT — see [LICENSE](LICENSE).
