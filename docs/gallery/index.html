@@ -1823,18 +1823,28 @@
       var blockStyle = 'display:block;background:rgba(0,0,0,0.35);margin-top:5px;padding:6px 8px;' +
                        'border-radius:4px;font-size:0.85em;word-break:break-all;white-space:pre-wrap;line-height:1.4';
 
+      // Pre-fill a GitHub issue with title + body template (works for anyone with a GitHub account)
+      var issueTitle = 'Overlay submission: ' + (meta.name || 'New Overlay');
+      var issueBody  =
+        '**Paste your HTML below** (it was copied to your clipboard):\n\n' +
+        '```html\n\n```\n\n' +
+        '**Add this entry to `manifest.json`:**\n\n' +
+        '```json\n' + manifestEntry + '\n```';
+      var issueUrl = 'https://github.com/jhlwscom/stepstick/issues/new' +
+        '?title=' + encodeURIComponent(issueTitle) +
+        '&body='  + encodeURIComponent(issueBody);
+
       function buildNotice(copied) {
         noticeEl.innerHTML =
-          (copied ? '<strong>HTML copied!</strong> ' : '<strong>GitHub tab opened.</strong> ') +
-          'Name the file <code style="' + codeStyle + '">' + esc(suggestedId) + '.html</code>' +
-          (copied ? ', paste' : ', copy your code and paste it') +
-          ', then click <em>"Propose new file"</em>.<br><br>' +
-          'Also add this line to <code style="' + codeStyle + '">manifest.json</code> in a separate edit:' +
+          (copied ? '<strong>HTML copied!</strong> ' : '') +
+          'In the GitHub issue that just opened, paste your overlay HTML into the code block and submit. ' +
+          'A maintainer will review it and add it to the gallery.<br><br>' +
+          'The issue already contains the <code style="' + codeStyle + '">manifest.json</code> entry:' +
           '<code style="' + blockStyle + '">' + esc(manifestEntry) + '</code>';
         notice.style.display = '';
       }
 
-      window.open('https://github.com/jhlwscom/stepstick/new/main/docs/gallery/overlays', '_blank', 'noopener');
+      window.open(issueUrl, '_blank', 'noopener');
       navigator.clipboard.writeText(html)
         .then(function () { buildNotice(true); })
         .catch(function () { buildNotice(false); });
